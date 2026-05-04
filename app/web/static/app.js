@@ -28,6 +28,7 @@ const emptyState = document.getElementById("emptyState");
 const videoName = document.getElementById("videoName");
 const statusPill = document.getElementById("statusPill");
 const dirtyBadge = document.getElementById("dirtyBadge");
+const stopJobBtn = document.getElementById("stopJobBtn");
 const languageBadge = document.getElementById("languageBadge");
 const progressBadge = document.getElementById("progressBadge");
 const renderProgress = document.getElementById("renderProgress");
@@ -93,6 +94,7 @@ const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
 const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
+const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const API_SETTING_FIELDS = [
   "openai_api_key",
   "openai_model",
@@ -113,6 +115,7 @@ const STATUS_LABELS = {
   completed: "Hoàn tất",
   failed: "Thất bại",
   completed_with_errors: "Hoàn tất có lỗi",
+  cancelled: "Đã dừng",
 };
 
 const ERROR_TRANSLATIONS = [
@@ -138,6 +141,7 @@ const STAGE_LABELS = {
   completed: "Hoàn tất",
   completed_with_errors: "Hoàn tất có lỗi",
   failed: "Thất bại",
+  cancelled: "Đã dừng",
   render_hardsub_failed: "Xuất phụ đề thất bại",
   render_voiceover_failed: "Xuất thuyết minh thất bại",
 };
@@ -214,10 +218,15 @@ function setRenderActionLink(element, enabled, title) {
   element.title = enabled ? title : "Cần có phụ đề trước khi xuất video.";
 }
 
-function setDirty(value) {
+function setDirty(value, options = {}) {
   state.dirty = value;
   dirtyBadge.textContent = value ? "Chưa lưu" : "Đã lưu";
   dirtyBadge.classList.toggle("dirty", value);
+  if (value) {
+    persistSubtitleDraftQuietly();
+  } else if (options.clearDraft !== false) {
+    clearSubtitleDraft();
+  }
   if (state.previewMode === "hardsub") {
     state.previewSourceMode = preferredPreviewSourceMode("hardsub");
     setPreviewButtons();
@@ -225,10 +234,82 @@ function setDirty(value) {
   }
 }
 
+function subtitleDraftKey(jobId = state.jobId) {
+  return jobId ? `${SUBTITLE_DRAFT_STORAGE_PREFIX}.${jobId}` : null;
+}
+
+function subtitleDraftPayload() {
+  return {
+    saved_at: new Date().toISOString(),
+    selected_segment_id: state.selectedSegmentId,
+    segments: sanitizeSegmentsForSave(),
+  };
+}
+
+function persistSubtitleDraftQuietly() {
+  const key = subtitleDraftKey();
+  if (!key || !state.segments.length) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(subtitleDraftPayload()));
+  } catch (error) {
+  }
+}
+
+function clearSubtitleDraft(jobId = state.jobId) {
+  const key = subtitleDraftKey(jobId);
+  if (!key) {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+  }
+}
+
+function loadSubtitleDraft(jobId = state.jobId) {
+  const key = subtitleDraftKey(jobId);
+  if (!key) {
+    return null;
+  }
+  try {
+    return JSON.parse(window.localStorage.getItem(key) || "null");
+  } catch (error) {
+    return null;
+  }
+}
+
+function applySubtitleDraftIfAvailable(job) {
+  if (state.dirty || !job?.job_id) {
+    return false;
+  }
+  const draft = loadSubtitleDraft(job.job_id);
+  if (!draft?.segments?.length) {
+    return false;
+  }
+  state.segments = cloneSegments(draft.segments);
+  state.selectedSegmentId = Number(draft.selected_segment_id || state.segments[0]?.id || null);
+  state.dirty = true;
+  dirtyBadge.textContent = "Có nháp tự lưu";
+  dirtyBadge.classList.add("dirty");
+  showToast("Đã khôi phục nháp phụ đề tự lưu.", "ok");
+  return true;
+}
+
 function setStatus(text, tone = "neutral") {
   statusPill.textContent = text;
   statusPill.dataset.tone = tone;
   statusPill.title = text;
+}
+
+function updateStopJobButton(job = state.job) {
+  if (!stopJobBtn) {
+    return;
+  }
+  const canStop = Boolean(job?.job_id && ["queued", "running"].includes(job.status));
+  stopJobBtn.classList.toggle("hidden", !canStop);
+  stopJobBtn.disabled = false;
 }
 
 function filenameStem(value) {
@@ -599,6 +680,7 @@ function askSaveChanges(message = "Bạn muốn lưu thay đổi trước khi ti
 
 async function confirmUnsavedChanges(message) {
   if (!state.dirty) {
+    clearSubtitleDraft();
     return true;
   }
 
@@ -1020,6 +1102,7 @@ function renderJobList(jobs) {
       item.classList.add("selected");
     }
     const filename = String(job.input_video || job.job_id).split(/[\\/]/).pop();
+    const canStopJob = ["queued", "running"].includes(job.status);
     item.innerHTML = `
       <button class="job-select" type="button" data-job-action="select">
         <div>
@@ -1028,6 +1111,7 @@ function renderJobList(jobs) {
         </div>
         <small class="job-status">${escapeHtml(statusLabel(job.status))}</small>
       </button>
+      ${canStopJob ? '<button class="job-stop" type="button" data-job-action="stop" title="Dừng tác vụ này">Dừng</button>' : ""}
       <button class="job-delete" type="button" data-job-action="delete" title="Xoá tác vụ này">Xoá</button>
     `;
     jobList.appendChild(item);
@@ -1250,6 +1334,7 @@ function applyPlaybackHighlight(currentTime) {
 function applyJobState(job) {
   state.job = job;
   state.jobId = job.job_id;
+  const restoredDraft = applySubtitleDraftIfAvailable(job);
   if (!state.dirty || !state.segments.length) {
     state.segments = cloneSegments(job.segments);
   }
@@ -1265,6 +1350,7 @@ function applyJobState(job) {
   const jobPercent = Math.round((job.progress || 0) * 100);
   progressBadge.textContent = `${jobPercent}%`;
   updateRenderProgress(job);
+  updateStopJobButton(job);
   if (translateSubtitleBtn) {
     translateSubtitleBtn.disabled = !job.downloads?.transcript_json;
     translateSubtitleBtn.title = translateSubtitleBtn.disabled
@@ -1287,7 +1373,11 @@ function applyJobState(job) {
     emptyState.style.display = "none";
   }
 
-  setStatus(`${stageLabel(job.stage)} | ${jobPercent}%`, job.status === "completed_with_errors" ? "warn" : "neutral");
+  if (restoredDraft) {
+    setStatus("Đã khôi phục nháp phụ đề tự lưu.", "warn");
+  } else {
+    setStatus(`${stageLabel(job.stage)} | ${jobPercent}%`, job.status === "completed_with_errors" ? "warn" : "neutral");
+  }
   renderAll();
 
   if (job.status === "completed") {
@@ -1327,6 +1417,13 @@ function applyJobState(job) {
     stopPolling();
     pollJobs();
   }
+
+  if (job.status === "cancelled") {
+    state.pendingExportSave = null;
+    setStatus(job.errors?.[0] || "Đã dừng tác vụ", "warn");
+    stopPolling();
+    pollJobs();
+  }
 }
 
 async function pollJob(jobId) {
@@ -1347,7 +1444,7 @@ async function loadJob(jobId) {
   state.jobId = jobId;
   state.selectedSegmentId = null;
   state.segments = [];
-  setDirty(false);
+  setDirty(false, { clearDraft: false });
   await pollJob(jobId);
   if (["queued", "running"].includes(state.job?.status)) {
     startPolling();
@@ -1372,6 +1469,7 @@ function clearSelectedJob() {
   languageBadge.textContent = "ngôn ngữ gốc: --";
   progressBadge.textContent = "0%";
   updateRenderProgress(null);
+  updateStopJobButton(null);
   if (translateSubtitleBtn) {
     translateSubtitleBtn.disabled = true;
     translateSubtitleBtn.title = "Cần xử lý video xong trước khi dịch lại";
@@ -1624,6 +1722,47 @@ async function runTranslate() {
   setStatus("Đã đưa lệnh dịch lại phụ đề vào hàng đợi...", "neutral");
   startPolling();
   return true;
+}
+
+async function stopCurrentJob() {
+  if (!state.jobId || !["queued", "running"].includes(state.job?.status)) {
+    return;
+  }
+  if (!window.confirm("Dừng tác vụ đang chạy/chờ này?")) {
+    return;
+  }
+  if (stopJobBtn) {
+    stopJobBtn.disabled = true;
+  }
+  setStatus("Đang gửi lệnh dừng tác vụ...", "warn");
+  const response = await fetch(`/api/jobs/${state.jobId}/cancel`, { method: "POST" });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Không thể dừng tác vụ." }));
+    throw new Error(userMessage(error.detail || "Không thể dừng tác vụ."));
+  }
+  const job = await response.json();
+  applyJobState(job);
+  await pollJobs();
+}
+
+async function stopJobById(jobId) {
+  if (!jobId) {
+    return;
+  }
+  if (jobId === state.jobId) {
+    await stopCurrentJob();
+    return;
+  }
+  if (!window.confirm("Dừng tác vụ đang chạy/chờ này?")) {
+    return;
+  }
+  const response = await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Không thể dừng tác vụ." }));
+    throw new Error(userMessage(error.detail || "Không thể dừng tác vụ."));
+  }
+  await pollJobs();
+  showToast("Đã gửi lệnh dừng tác vụ.", "ok");
 }
 
 function updateSelectedSegment(updater) {
@@ -1909,6 +2048,7 @@ form.addEventListener("submit", async (event) => {
 
   const data = await response.json();
   const queuedJobs = data.jobs || [data];
+  clearSubtitleDraft();
   state.jobId = queuedJobs[0].job_id;
   state.previewMode = "source";
   setDirty(false);
@@ -2026,6 +2166,19 @@ if (translateSubtitleBtn) {
     try {
       await runTranslate();
     } catch (error) {
+      setStatus(userMessage(error.message), "error");
+    }
+  });
+}
+
+if (stopJobBtn) {
+  stopJobBtn.addEventListener("click", async () => {
+    try {
+      await stopCurrentJob();
+    } catch (error) {
+      if (stopJobBtn) {
+        stopJobBtn.disabled = false;
+      }
       setStatus(userMessage(error.message), "error");
     }
   });
@@ -2279,6 +2432,10 @@ jobList.addEventListener("click", async (event) => {
     const action = event.target.closest("[data-job-action]")?.dataset.jobAction || "select";
     if (action === "delete") {
       await deleteJob(item.dataset.id);
+      return;
+    }
+    if (action === "stop") {
+      await stopJobById(item.dataset.id);
       return;
     }
     await loadJob(item.dataset.id);

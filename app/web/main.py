@@ -440,11 +440,22 @@ async def delete_job(job_id: str) -> JSONResponse:
     _get_manifest_or_404(job_id)
     active_job_ids = set(get_job_queue().snapshot().get("queued_ids", []))
     if job_id in active_job_ids:
-        raise HTTPException(status_code=409, detail="Không thể xoá tác vụ đang chạy. Hãy dừng server bằng Ctrl+C rồi mở lại nếu muốn xoá tác vụ này.")
+        manifest = _get_manifest_or_404(job_id)
+        if manifest.status in {"queued", "running"}:
+            raise HTTPException(status_code=409, detail="Không thể xoá tác vụ đang chạy. Hãy bấm Dừng trước rồi xoá lại.")
     deleted = get_pipeline().jobs.delete_job(job_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Không tìm thấy thư mục tác vụ.")
     return JSONResponse({"deleted": True, "job_id": job_id})
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str) -> JSONResponse:
+    manifest = _get_manifest_or_404(job_id)
+    if manifest.status not in {"queued", "running"}:
+        return JSONResponse(_manifest_payload(manifest))
+    cancelled_manifest = get_pipeline().cancel_job(job_id)
+    return JSONResponse(_manifest_payload(cancelled_manifest))
 
 
 @app.put("/api/jobs/{job_id}/segments")

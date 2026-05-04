@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-35" />
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-36" />
   </head>
   <body>
     <div class="capcut-shell">
@@ -185,6 +185,7 @@
             <span class="status-pill" id="progressBadge">0%</span>
             <span class="status-pill" id="statusPill">Sẵn sàng</span>
             <span class="dirty-pill" id="dirtyBadge">Đã lưu</span>
+            <button class="stop-job-button hidden" id="stopJobBtn" type="button">Dừng</button>
           </div>
           <div class="canvas-controls collapsed" id="canvasControls" aria-label="Điều chỉnh khung video">
             <button class="canvas-controls-toggle" id="canvasControlsToggle" type="button" aria-expanded="false">⚙ Chỉnh</button>
@@ -335,6 +336,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-35" defer></script>
+    <script src="/static/app.js?v=capcut-layout-20260504-36" defer></script>
   </body>
 </html>

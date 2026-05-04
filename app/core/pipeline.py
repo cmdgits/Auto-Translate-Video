@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import time
@@ -8,7 +8,7 @@ from typing import Callable
 from app.asr.faster_whisper_backend import FasterWhisperBackend
 from app.config import AppConfig
 from app.config import RenderConfig
-from app.core.exceptions import ConfigurationError, ProcessError
+from app.core.exceptions import ConfigurationError, JobCancelledError, ProcessError
 from app.core.jobs import JobContext, JobManager
 from app.media.audio_extract import extract_audio_to_wav
 from app.media.probe import probe_video
@@ -35,8 +35,8 @@ ProgressHook = Callable[[JobManifest], None]
 def ensure_video_has_audio(metadata: VideoMetadata) -> None:
     if metadata.audio_stream_index is None:
         raise ProcessError(
-            "Video này không có luồng âm thanh, nên không thể tách audio để nhận dạng giọng nói. "
-            "Hãy chọn video có audio hoặc tải lại bản có âm thanh."
+            "Video nÃ y khÃ´ng cÃ³ luá»“ng Ã¢m thanh, nÃªn khÃ´ng thá»ƒ tÃ¡ch audio Ä‘á»ƒ nháº­n dáº¡ng giá»ng nÃ³i. "
+            "HÃ£y chá»n video cÃ³ audio hoáº·c táº£i láº¡i báº£n cÃ³ Ã¢m thanh."
         )
 
 
@@ -44,6 +44,31 @@ class VideoTranslationPipeline:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.jobs = JobManager(config.directories.jobs_dir)
+
+    def cancel_job(self, job_id: str, reason: str = "TÃ¡c vá»¥ Ä‘Ã£ Ä‘Æ°á»£c dá»«ng theo yÃªu cáº§u.") -> JobManifest:
+        context, manifest = self._require_job(job_id)
+        if manifest.status not in {"queued", "running"}:
+            return manifest
+        cancelled_manifest = manifest.model_copy(
+            update={
+                "status": "cancelled",
+                "stage": "cancelled",
+                "progress": 1.0,
+                "errors": [reason],
+                "outputs": self._collect_existing_outputs(context),
+            }
+        )
+        self._emit(context, cancelled_manifest, None)
+        return cancelled_manifest
+
+    def _raise_if_cancelled(self, context: JobContext) -> None:
+        manifest = self.jobs.load_manifest(context.job_id)
+        if manifest and manifest.status == "cancelled":
+            raise JobCancelledError(manifest.errors[0] if manifest.errors else "TÃ¡c vá»¥ Ä‘Ã£ Ä‘Æ°á»£c dá»«ng.")
+
+    def _emit_running(self, context: JobContext, manifest: JobManifest, progress_hook: ProgressHook | None) -> None:
+        self._raise_if_cancelled(context)
+        self._emit(context, manifest, progress_hook)
 
     def create_job_context(self, input_name: str, input_video: Path, output_root: Path | None = None) -> JobContext:
         return self.jobs.create_context(input_name=input_name, input_video=input_video, output_root=output_root)
@@ -66,7 +91,8 @@ class VideoTranslationPipeline:
         progress_hook: ProgressHook | None = None,
     ) -> JobManifest:
         run_options = options or PipelineRunOptions()
-        manifest = JobManifest(
+        existing_manifest = self.jobs.load_manifest(context.job_id)
+        manifest = existing_manifest or JobManifest(
             job_id=context.job_id,
             status="queued",
             stage="queued",
@@ -75,16 +101,19 @@ class VideoTranslationPipeline:
             output_dir=str(context.root_dir),
             options=sanitize_pipeline_options(run_options),
         )
-        self._emit(context, manifest, progress_hook)
+        if existing_manifest is None:
+            self._emit(context, manifest, progress_hook)
         timings: dict[str, float] = {}
         started_at = time.perf_counter()
 
         try:
+            self._raise_if_cancelled(context)
             manifest = manifest.model_copy(update={"status": "running", "stage": "probing", "progress": 0.08})
-            self._emit(context, manifest, progress_hook)
+            self._emit_running(context, manifest, progress_hook)
             metadata = probe_video(context.input_video, self.config.ffprobe_bin)
             manifest = manifest.model_copy(update={"metadata": metadata})
             ensure_video_has_audio(metadata)
+            self._raise_if_cancelled(context)
 
             manifest = manifest.model_copy(
                 update={
@@ -92,18 +121,20 @@ class VideoTranslationPipeline:
                     "progress": 0.2,
                 }
             )
-            self._emit(context, manifest, progress_hook)
+            self._emit_running(context, manifest, progress_hook)
             extract_audio_to_wav(context.input_video, context.extracted_audio_path, self.config.ffmpeg_bin)
+            self._raise_if_cancelled(context)
 
             manifest = manifest.model_copy(update={"stage": "transcribing", "progress": 0.48})
-            self._emit(context, manifest, progress_hook)
+            self._emit_running(context, manifest, progress_hook)
             asr_started = time.perf_counter()
             asr_backend = FasterWhisperBackend(self.config.asr, run_options.asr_model_size)
 
             def on_asr_progress(asr_progress: float) -> None:
                 nonlocal manifest
+                self._raise_if_cancelled(context)
                 manifest = manifest.model_copy(update={"progress": min(0.48 + asr_progress * 0.2, 0.68)})
-                self._emit(context, manifest, progress_hook)
+                self._emit_running(context, manifest, progress_hook)
 
             transcript = asr_backend.transcribe(
                 audio_path=context.extracted_audio_path,
@@ -113,6 +144,7 @@ class VideoTranslationPipeline:
                 progress_hook=on_asr_progress,
             )
             timings["asr_sec"] = round(time.perf_counter() - asr_started, 3)
+            self._raise_if_cancelled(context)
             self._write_transcript_json(transcript, context.transcript_json_path)
             manifest = manifest.model_copy(update={"outputs": self._collect_existing_outputs(context)})
 
@@ -123,7 +155,7 @@ class VideoTranslationPipeline:
                     "detected_language": transcript.detected_language,
                 }
             )
-            self._emit(context, manifest, progress_hook)
+            self._emit_running(context, manifest, progress_hook)
             translate_started = time.perf_counter()
             translator = build_translator(self.config.translation, run_options)
             source_language = (
@@ -135,8 +167,9 @@ class VideoTranslationPipeline:
 
             def on_translate_progress(translate_progress: float) -> None:
                 nonlocal manifest
+                self._raise_if_cancelled(context)
                 manifest = manifest.model_copy(update={"progress": min(0.7 + translate_progress * 0.11, 0.81)})
-                self._emit(context, manifest, progress_hook)
+                self._emit_running(context, manifest, progress_hook)
 
             translations = translator.translate_segments(
                 transcript.segments,
@@ -144,12 +177,13 @@ class VideoTranslationPipeline:
                 target_language=run_options.target_language or self.config.translation.target_language,
                 progress_callback=on_translate_progress,
             )
+            self._raise_if_cancelled(context)
             for segment, translated in zip(transcript.segments, translations, strict=False):
                 segment.translated_text = translated
             timings["translate_sec"] = round(time.perf_counter() - translate_started, 3)
 
             manifest = manifest.model_copy(update={"stage": "writing_subtitles", "progress": 0.82})
-            self._emit(context, manifest, progress_hook)
+            self._emit_running(context, manifest, progress_hook)
             transcript = self._write_transcript_assets(transcript, context, preserve_existing=False)
             outputs = self._collect_existing_outputs(context)
 
@@ -157,17 +191,19 @@ class VideoTranslationPipeline:
             if run_options.render_hardsub:
                 try:
                     manifest = manifest.model_copy(update={"stage": "rendering_hardsub", "progress": 0.82})
-                    self._emit(context, manifest, progress_hook)
+                    self._emit_running(context, manifest, progress_hook)
                     render_started = time.perf_counter()
 
                     def on_hardsub_progress(progress: float) -> None:
                         nonlocal manifest
+                        self._raise_if_cancelled(context)
                         manifest = manifest.model_copy(
                             update={"progress": min(0.82 + progress * 0.09, 0.91)}
                         )
-                        self._emit(context, manifest, progress_hook)
+                        self._emit_running(context, manifest, progress_hook)
 
                     self._render_hardsub_output(context, run_options, on_hardsub_progress)
+                    self._raise_if_cancelled(context)
                     timings["render_hardsub_sec"] = round(time.perf_counter() - render_started, 3)
                 except Exception as exc:  # pragma: no cover - runtime dependency path
                     render_errors.append(f"Hardsub render loi: {exc}")
@@ -176,16 +212,17 @@ class VideoTranslationPipeline:
             if run_options.generate_voiceover:
                 try:
                     manifest = manifest.model_copy(update={"stage": "rendering_voiceover", "progress": 0.91})
-                    self._emit(context, manifest, progress_hook)
+                    self._emit_running(context, manifest, progress_hook)
                     render_started = time.perf_counter()
                     has_original_audio = bool(manifest.metadata and manifest.metadata.audio_stream_index is not None)
 
                     def on_voiceover_progress(progress: float) -> None:
                         nonlocal manifest
+                        self._raise_if_cancelled(context)
                         manifest = manifest.model_copy(
                             update={"progress": min(0.91 + progress * 0.08, 0.99)}
                         )
-                        self._emit(context, manifest, progress_hook)
+                        self._emit_running(context, manifest, progress_hook)
 
                     self._render_voiceover_output(
                         context,
@@ -195,6 +232,7 @@ class VideoTranslationPipeline:
                         has_original_audio,
                         on_voiceover_progress,
                     )
+                    self._raise_if_cancelled(context)
                     timings["render_voiceover_sec"] = round(time.perf_counter() - render_started, 3)
                 except Exception as exc:  # pragma: no cover - runtime dependency path
                     render_errors.append(f"Voice-over render loi: {exc}")
@@ -213,8 +251,23 @@ class VideoTranslationPipeline:
                     "errors": render_errors,
                 }
             )
+            self._raise_if_cancelled(context)
             self._emit(context, final_manifest, progress_hook)
             return final_manifest
+        except JobCancelledError as exc:
+            timings["total_sec"] = round(time.perf_counter() - started_at, 3)
+            cancelled_manifest = manifest.model_copy(
+                update={
+                    "status": "cancelled",
+                    "stage": "cancelled",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                    "timings": timings,
+                }
+            )
+            self._emit(context, cancelled_manifest, progress_hook)
+            return cancelled_manifest
         except Exception as exc:
             timings["total_sec"] = round(time.perf_counter() - started_at, 3)
             failed_manifest = manifest.model_copy(
@@ -275,6 +328,7 @@ class VideoTranslationPipeline:
         started_at = time.perf_counter()
 
         try:
+            self._raise_if_cancelled(context)
             transcript = self._read_transcript(context)
             translator = build_translator(self.config.translation, run_options)
             source_language = (
@@ -287,10 +341,11 @@ class VideoTranslationPipeline:
 
             def on_translate_progress(translate_progress: float) -> None:
                 nonlocal current_manifest
+                self._raise_if_cancelled(context)
                 current_manifest = current_manifest.model_copy(
                     update={"progress": min(0.05 + translate_progress * 0.9, 0.95)}
                 )
-                self._emit(context, current_manifest, None)
+                self._emit_running(context, current_manifest, None)
 
             translations = translator.translate_segments(
                 transcript.segments,
@@ -298,6 +353,7 @@ class VideoTranslationPipeline:
                 target_language=run_options.target_language or self.config.translation.target_language,
                 progress_callback=on_translate_progress,
             )
+            self._raise_if_cancelled(context)
             for segment, translated in zip(transcript.segments, translations, strict=False):
                 segment.translated_text = translated
                 segment.subtitle_text = None
@@ -316,8 +372,21 @@ class VideoTranslationPipeline:
                     "options": {**manifest.options, **sanitize_pipeline_options(run_options)},
                 }
             )
+            self._raise_if_cancelled(context)
             self._emit(context, updated_manifest, None)
             return updated_manifest
+        except JobCancelledError as exc:
+            cancelled_manifest = running_manifest.model_copy(
+                update={
+                    "status": "cancelled",
+                    "stage": "cancelled",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                }
+            )
+            self._emit(context, cancelled_manifest, None)
+            return cancelled_manifest
         except Exception as exc:
             failed_manifest = running_manifest.model_copy(
                 update={
@@ -344,18 +413,21 @@ class VideoTranslationPipeline:
         started_at = time.perf_counter()
 
         try:
+            self._raise_if_cancelled(context)
             transcript = self._read_transcript(context)
             self._write_transcript_assets(transcript, context, preserve_existing=True)
             current_manifest = running_manifest
 
             def on_hardsub_progress(progress: float) -> None:
                 nonlocal current_manifest
+                self._raise_if_cancelled(context)
                 current_manifest = current_manifest.model_copy(
                     update={"progress": min(progress, 0.999)}
                 )
-                self._emit(context, current_manifest, None)
+                self._emit_running(context, current_manifest, None)
 
             self._render_hardsub_output(context, options, on_hardsub_progress)
+            self._raise_if_cancelled(context)
             timings = {**manifest.timings, "render_hardsub_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
                 update={
@@ -367,8 +439,21 @@ class VideoTranslationPipeline:
                     "errors": [],
                 }
             )
+            self._raise_if_cancelled(context)
             self._emit(context, updated_manifest, None)
             return updated_manifest
+        except JobCancelledError as exc:
+            cancelled_manifest = running_manifest.model_copy(
+                update={
+                    "status": "cancelled",
+                    "stage": "cancelled",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                }
+            )
+            self._emit(context, cancelled_manifest, None)
+            return cancelled_manifest
         except Exception as exc:
             failed_manifest = running_manifest.model_copy(
                 update={
@@ -396,6 +481,7 @@ class VideoTranslationPipeline:
         started_at = time.perf_counter()
 
         try:
+            self._raise_if_cancelled(context)
             transcript = self._read_transcript(context)
             self._write_transcript_assets(transcript, context, preserve_existing=True)
             render_warnings: list[str] = []
@@ -404,10 +490,11 @@ class VideoTranslationPipeline:
 
             def on_voiceover_progress(progress: float) -> None:
                 nonlocal current_manifest
+                self._raise_if_cancelled(context)
                 current_manifest = current_manifest.model_copy(
                     update={"progress": min(progress, 0.999)}
                 )
-                self._emit(context, current_manifest, None)
+                self._emit_running(context, current_manifest, None)
 
             self._render_voiceover_output(
                 context,
@@ -417,6 +504,7 @@ class VideoTranslationPipeline:
                 has_original_audio,
                 on_voiceover_progress,
             )
+            self._raise_if_cancelled(context)
             timings = {**manifest.timings, "render_voiceover_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
                 update={
@@ -428,8 +516,21 @@ class VideoTranslationPipeline:
                     "errors": render_warnings,
                 }
             )
+            self._raise_if_cancelled(context)
             self._emit(context, updated_manifest, None)
             return updated_manifest
+        except JobCancelledError as exc:
+            cancelled_manifest = running_manifest.model_copy(
+                update={
+                    "status": "cancelled",
+                    "stage": "cancelled",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                }
+            )
+            self._emit(context, cancelled_manifest, None)
+            return cancelled_manifest
         except Exception as exc:
             failed_manifest = running_manifest.model_copy(
                 update={
@@ -563,7 +664,7 @@ class VideoTranslationPipeline:
     def _read_transcript(self, context: JobContext) -> TranscriptDocument:
         if not context.transcript_json_path.exists():
             raise ProcessError(
-                "Chưa có bản nhận dạng giọng nói cho job này. Hãy chạy xử lý video xong trước, rồi mới bấm Dịch lại sang tiếng Việt."
+                "ChÆ°a cÃ³ báº£n nháº­n dáº¡ng giá»ng nÃ³i cho job nÃ y. HÃ£y cháº¡y xá»­ lÃ½ video xong trÆ°á»›c, rá»“i má»›i báº¥m Dá»‹ch láº¡i sang tiáº¿ng Viá»‡t."
             )
         return TranscriptDocument.model_validate_json(context.transcript_json_path.read_text(encoding="utf-8"))
 
@@ -670,3 +771,4 @@ class VideoTranslationPipeline:
         self.jobs.write_manifest(context, manifest)
         if progress_hook:
             progress_hook(manifest)
+

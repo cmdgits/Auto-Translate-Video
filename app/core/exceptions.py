@@ -13,3 +13,6 @@ class ConfigurationError(AppError):
 class ProcessError(AppError):
     """Raised when a pipeline step fails."""
 
+
+class JobCancelledError(AppError):
+    """Raised when a job is cancelled by the user."""

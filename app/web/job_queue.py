@@ -95,7 +95,11 @@ class JobQueue:
         while True:
             queued_job = self._queue.get()
             try:
-                self.pipeline_factory().process_job(queued_job.context, queued_job.options)
+                pipeline = self.pipeline_factory()
+                manifest = pipeline.jobs.load_manifest(queued_job.context.job_id)
+                if manifest and manifest.status == "cancelled":
+                    continue
+                pipeline.process_job(queued_job.context, queued_job.options)
             except Exception:
                 logger.exception("Background job failed: %s", queued_job.context.job_id)
             finally:

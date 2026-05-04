@@ -443,6 +443,22 @@ button {
   border: 1px solid rgba(255, 107, 107, 0.28);
 }
 
+.job-stop {
+  align-self: stretch;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(255, 188, 66, 0.13);
+  color: #ffd58a;
+  border: 1px solid rgba(255, 188, 66, 0.28);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.job-stop:hover {
+  background: rgba(255, 188, 66, 0.22);
+}
+
 .api-settings-panel {
   position: absolute;
   left: 12px;
@@ -563,7 +579,8 @@ button {
 }
 
 .status-pill,
-.dirty-pill {
+.dirty-pill,
+.stop-job-button {
   flex-shrink: 0;
   min-width: 0;
   overflow: hidden;
@@ -575,6 +592,22 @@ button {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stop-job-button {
+  border: 1px solid rgba(196, 59, 59, 0.18);
+  background: rgba(255, 107, 107, 0.12);
+  color: #c43b3b;
+  cursor: pointer;
+}
+
+.stop-job-button:hover {
+  background: rgba(255, 107, 107, 0.2);
+}
+
+.stop-job-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 #statusPill {

@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-JobStatus = Literal["queued", "running", "completed", "failed", "completed_with_errors"]
+JobStatus = Literal["queued", "running", "completed", "failed", "completed_with_errors", "cancelled"]
 
 
 class VideoMetadata(BaseModel):
