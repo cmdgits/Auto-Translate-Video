@@ -1,6 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Callable
@@ -36,6 +37,7 @@ from app.tts.edge_tts_backend import EdgeTTSBackend
 from app.tts.voiceover import mix_voiceover_audio
 
 ProgressHook = Callable[[JobManifest], None]
+SUBTITLE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_-]{2,12}$")
 
 
 def ensure_video_has_audio(metadata: VideoMetadata) -> None:
@@ -475,6 +477,7 @@ class VideoTranslationPipeline:
             raise
 
     def render_softsub(self, job_id: str, options: PipelineRunOptions | None = None) -> JobManifest:
+        run_options = options or PipelineRunOptions()
         context, manifest = self._require_job(job_id)
         running_manifest = manifest.model_copy(
             update={
@@ -498,7 +501,7 @@ class VideoTranslationPipeline:
                 current_manifest = current_manifest.model_copy(update={"progress": min(progress, 0.999)})
                 self._emit_running(context, current_manifest, None)
 
-            self._render_softsub_output(context, on_softsub_progress)
+            self._render_softsub_output(context, run_options, on_softsub_progress)
             self._raise_if_cancelled(context)
             timings = {**manifest.timings, "render_softsub_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
@@ -651,21 +654,27 @@ class VideoTranslationPipeline:
     def _render_softsub_output(
         self,
         context: JobContext,
+        options: PipelineRunOptions | None = None,
         progress_callback: Callable[[float], None] | None = None,
     ) -> Path:
         if not context.original_srt_path.exists() or not context.srt_path.exists():
             raise ProcessError("Chưa có đủ phụ đề gốc và phụ đề tiếng Việt để mux softsub.")
         duration_sec = self._duration_for_context(context)
         subtitle_tracks = [
-            (context.original_srt_path, "eng", "Phụ đề gốc"),
             (context.srt_path, "vie", "Phụ đề tiếng Việt"),
+            (context.original_srt_path, "und", "Phụ đề gốc"),
         ]
+        render_config = self._render_config_for_options(options)
+        extra_tracks, default_subtitle_index = self._write_extra_subtitle_tracks(context, options, len(subtitle_tracks))
+        subtitle_tracks.extend(extra_tracks)
         context.softsub_command_path.write_text(
             build_mux_subtitle_tracks_command_string(
                 context.input_video,
                 subtitle_tracks,
                 context.softsub_video_path,
                 self.config.ffmpeg_bin,
+                render_config,
+                default_subtitle_index=default_subtitle_index,
             ),
             encoding="utf-8",
         )
@@ -674,10 +683,46 @@ class VideoTranslationPipeline:
             subtitle_tracks,
             context.softsub_video_path,
             self.config.ffmpeg_bin,
-            self.config.render,
+            render_config,
             duration_sec=duration_sec,
             progress_callback=progress_callback,
+            default_subtitle_index=default_subtitle_index,
         )
+
+    def _write_extra_subtitle_tracks(
+        self,
+        context: JobContext,
+        options: PipelineRunOptions | None,
+        base_track_count: int,
+    ) -> tuple[list[tuple[Path, str, str]], int]:
+        extra_tracks = list((options.extra_subtitle_tracks if options else []) or [])[:12]
+        if not extra_tracks:
+            return [], 0
+
+        extra_dir = context.subtitles_dir / "extra_tracks"
+        extra_dir.mkdir(parents=True, exist_ok=True)
+        subtitle_tracks: list[tuple[Path, str, str]] = []
+        default_subtitle_index = 0
+        has_extra_default = False
+        for index, track in enumerate(extra_tracks, start=1):
+            content = str(track.content or "").strip()
+            if not content:
+                continue
+            language = str(track.language or "und").strip().lower() or "und"
+            if not SUBTITLE_LANGUAGE_RE.match(language):
+                language = "und"
+            title = str(track.title or track.file_name or f"Phụ đề {index}").strip() or f"Phụ đề {index}"
+            safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(track.file_name or title).stem).strip("._") or f"track_{index}"
+            suffix = Path(track.file_name or "").suffix.lower()
+            if suffix not in {".srt", ".vtt", ".ass"}:
+                suffix = ".srt"
+            output_path = extra_dir / f"{index:02d}_{safe_name}{suffix}"
+            output_path.write_text(content.replace("\r\n", "\n").replace("\r", "\n"), encoding="utf-8")
+            subtitle_tracks.append((output_path, language, title))
+            if track.is_default and not has_extra_default:
+                default_subtitle_index = base_track_count + len(subtitle_tracks) - 1
+                has_extra_default = True
+        return subtitle_tracks, default_subtitle_index
 
     def _render_config_for_options(self, options: PipelineRunOptions | None = None) -> RenderConfig:
         if not options:

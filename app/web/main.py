@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -468,8 +469,31 @@ async def render_hardsub(
 
 @app.post("/api/jobs/{job_id}/render/softsub")
 async def render_softsub(job_id: str, options: PipelineRunOptions | None = Body(default=None)) -> JSONResponse:
-    manifest = get_job_queue().enqueue_existing(job_id, "render_softsub", options or PipelineRunOptions())
-    return JSONResponse(_manifest_payload(manifest))
+    manifest = _get_manifest_or_404(job_id)
+    if manifest.status in {"queued", "running"} and manifest.stage == "rendering_softsub":
+        return JSONResponse(_manifest_payload(manifest))
+
+    run_options = options or PipelineRunOptions()
+    queued_manifest = manifest.model_copy(
+        update={
+            "status": "queued",
+            "stage": "rendering_softsub",
+            "progress": 0.0,
+            "task_type": "render_softsub",
+            "options": {**(manifest.options or {}), **sanitize_pipeline_options(run_options)},
+            "errors": [],
+        }
+    )
+    get_pipeline().jobs.update_manifest(queued_manifest)
+
+    def run_softsub_render() -> None:
+        try:
+            get_pipeline().render_softsub(job_id, run_options)
+        except Exception:
+            return
+
+    threading.Thread(target=run_softsub_render, name=f"softsub-render-{job_id}", daemon=True).start()
+    return JSONResponse(_manifest_payload(queued_manifest))
 
 
 @app.post("/api/jobs/{job_id}/translate")

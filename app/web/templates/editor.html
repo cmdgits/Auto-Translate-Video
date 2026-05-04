@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-40" />
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-45" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -255,7 +255,6 @@
             <div class="toolbar-group export-format-group" aria-label="Xuất video">
               <a class="artifact-link disabled" href="#" id="hardsubLink">MP4 phụ đề</a>
               <a class="artifact-link disabled" href="#" id="softsubLink">MKV softsub</a>
-              <a class="artifact-link disabled" href="#" id="softsubCommandLink">Lệnh FFmpeg</a>
               <a class="artifact-link disabled" href="#" id="voiceoverLink">MP4 thuyết minh</a>
             </div>
           </div>
@@ -320,6 +319,18 @@
           </div>
         </section>
 
+        <section class="inspector-card subtitle-track-panel">
+          <div class="section-title track-panel-title">
+            <span>Track phụ đề MKV</span>
+            <button class="mini-button" id="addSubtitleTrackBtn" type="button">＋ Thêm track</button>
+          </div>
+          <input id="extraSubtitleFile" class="toolbar-file-input" type="file" accept=".srt,.vtt,.ass,.json,text/plain,text/vtt,application/json" multiple />
+          <p class="muted track-panel-hint">MKV luôn có phụ đề tiếng Việt và phụ đề gốc. Thêm track ở đây nếu muốn kèm Anh/Trung/Nhật...</p>
+          <div class="subtitle-track-list" id="subtitleTrackList">
+            <div class="script-empty">Chưa thêm track phụ đề riêng.</div>
+          </div>
+        </section>
+
         <section class="inspector-card script-panel">
           <div class="section-title"><span>Danh sách phụ đề</span></div>
           <div class="script-list" id="scriptList">
@@ -342,6 +353,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-40" defer></script>
+    <script src="/static/app.js?v=capcut-layout-20260504-45" defer></script>
   </body>
 </html>

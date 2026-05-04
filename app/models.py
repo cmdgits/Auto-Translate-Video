@@ -38,6 +38,14 @@ class TranscriptDocument(BaseModel):
     segments: list[TranscriptSegment] = Field(default_factory=list)
 
 
+class SubtitleTrackOption(BaseModel):
+    title: str = ""
+    language: str = "und"
+    content: str
+    file_name: str | None = None
+    is_default: bool = False
+
+
 class PipelineRunOptions(BaseModel):
     output_root: str | None = None
     asr_model_size: str | None = None
@@ -68,6 +76,7 @@ class PipelineRunOptions(BaseModel):
     subtitle_cover_mode: Literal["blur", "box"] | None = None
     subtitle_cover_opacity: float | None = None
     subtitle_cover_height_ratio: float | None = None
+    extra_subtitle_tracks: list[SubtitleTrackOption] = Field(default_factory=list)
 
 
 SENSITIVE_OPTION_KEYS = {
@@ -88,6 +97,17 @@ def sanitize_pipeline_options(options: PipelineRunOptions | dict[str, object]) -
     for key, value in values.items():
         if key in SENSITIVE_OPTION_KEYS:
             sanitized[f"{key}_configured"] = bool(value)
+        elif key == "extra_subtitle_tracks" and isinstance(value, list):
+            sanitized[key] = [
+                {
+                    "title": str(track.get("title") or "") if isinstance(track, dict) else "",
+                    "language": str(track.get("language") or "und") if isinstance(track, dict) else "und",
+                    "file_name": str(track.get("file_name") or "") if isinstance(track, dict) else "",
+                    "is_default": bool(track.get("is_default")) if isinstance(track, dict) else False,
+                    "size": len(str(track.get("content") or "")) if isinstance(track, dict) else 0,
+                }
+                for track in value
+            ]
         else:
             sanitized[key] = value
     return sanitized

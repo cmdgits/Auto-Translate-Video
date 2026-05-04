@@ -5,6 +5,9 @@ const apiSettingsForm = document.getElementById("apiSettingsForm");
 const fileInput = document.getElementById("videoFile");
 const subtitleFileInput = document.getElementById("subtitleFile");
 const importSubtitleBtn = document.getElementById("importSubtitleBtn");
+const extraSubtitleFileInput = document.getElementById("extraSubtitleFile");
+const addSubtitleTrackBtn = document.getElementById("addSubtitleTrackBtn");
+const subtitleTrackList = document.getElementById("subtitleTrackList");
 const videoPreview = document.getElementById("videoPreview");
 const canvasFrame = document.getElementById("canvasFrame");
 const canvasControls = document.getElementById("canvasControls");
@@ -51,7 +54,6 @@ const vttLink = document.getElementById("vttLink");
 const jsonLink = document.getElementById("jsonLink");
 const hardsubLink = document.getElementById("hardsubLink");
 const softsubLink = document.getElementById("softsubLink");
-const softsubCommandLink = document.getElementById("softsubCommandLink");
 const voiceoverLink = document.getElementById("voiceoverLink");
 const previewSourceBtn = document.getElementById("previewSourceBtn");
 const previewHardsubBtn = document.getElementById("previewHardsubBtn");
@@ -103,6 +105,7 @@ const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
+const EXTRA_SUBTITLE_TRACKS_STORAGE_PREFIX = "autoTranslateVideo.extraSubtitleTracks.v1";
 const API_SETTING_FIELDS = [
   "openai_api_key",
   "openai_model",
@@ -191,6 +194,7 @@ const state = {
   jobId: null,
   job: null,
   segments: [],
+  extraSubtitleTracks: [],
   selectedSegmentId: null,
   dirty: false,
   pollTimer: null,
@@ -662,6 +666,192 @@ function subtitleStylePayload() {
     subtitle_cover_opacity: state.subtitleStyle.coverOpacity / 100,
     subtitle_cover_height_ratio: state.subtitleStyle.coverHeight / 100,
   };
+}
+
+function extraSubtitleTracksStorageKey(jobId = state.jobId) {
+  return jobId ? `${EXTRA_SUBTITLE_TRACKS_STORAGE_PREFIX}.${jobId}` : null;
+}
+
+function persistExtraSubtitleTracks() {
+  const storageKey = extraSubtitleTracksStorageKey();
+  if (!storageKey) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(state.extraSubtitleTracks));
+  } catch (error) {
+  }
+}
+
+function loadExtraSubtitleTracks(jobId) {
+  const storageKey = extraSubtitleTracksStorageKey(jobId);
+  if (!storageKey) {
+    state.extraSubtitleTracks = [];
+    return;
+  }
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    state.extraSubtitleTracks = Array.isArray(saved)
+      ? saved.filter((track) => track && track.content).map((track, index) => ({
+        id: track.id || `${Date.now()}-${index}`,
+        title: String(track.title || track.fileName || `Phụ đề ${index + 1}`).trim(),
+        language: normalizeSubtitleLanguage(track.language || guessSubtitleLanguage(track.fileName || track.title || "")),
+        fileName: String(track.fileName || "").trim(),
+        content: String(track.content || ""),
+        isDefault: Boolean(track.isDefault),
+      }))
+      : [];
+  } catch (error) {
+    state.extraSubtitleTracks = [];
+  }
+}
+
+function normalizeSubtitleLanguage(value) {
+  const language = String(value || "und").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return language || "und";
+}
+
+function guessSubtitleLanguage(fileName = "") {
+  const text = String(fileName || "").toLowerCase();
+  const tokenMatch = text.match(/(?:^|[._\-\s])(vi|vie|en|eng|zh|zho|chi|ja|jpn|ko|kor|th|tha|id|ind|fr|fra|fre|de|deu|ger|es|spa)(?:[._\-\s]|$)/i);
+  const token = tokenMatch?.[1]?.toLowerCase();
+  const aliases = {
+    vi: "vie",
+    en: "eng",
+    zh: "zho",
+    chi: "zho",
+    ja: "jpn",
+    ko: "kor",
+    th: "tha",
+    id: "ind",
+    fr: "fra",
+    fre: "fra",
+    de: "deu",
+    ger: "deu",
+    es: "spa",
+  };
+  return aliases[token] || token || "und";
+}
+
+function subtitleTrackTitleFromFile(fileName, index) {
+  const stem = String(fileName || "").replace(/\.[^.]+$/, "").replace(/[._-]+/g, " ").trim();
+  return stem || `Phụ đề ${index + 1}`;
+}
+
+function renderSubtitleTrackList() {
+  if (!subtitleTrackList) {
+    return;
+  }
+  subtitleTrackList.innerHTML = "";
+  if (!state.extraSubtitleTracks.length) {
+    subtitleTrackList.innerHTML = '<div class="script-empty">Chưa thêm track phụ đề riêng.</div>';
+    return;
+  }
+  state.extraSubtitleTracks.forEach((track, index) => {
+    const item = document.createElement("div");
+    item.className = "subtitle-track-item";
+    item.dataset.id = track.id;
+    item.innerHTML = `
+      <div class="subtitle-track-head">
+        <strong>${escapeHtml(track.title || track.fileName || `Phụ đề ${index + 1}`)}</strong>
+        <div class="subtitle-track-actions">
+          <button class="subtitle-track-default ${track.isDefault ? "active" : ""}" type="button" data-track-action="default" title="Đặt làm track mặc định">${track.isDefault ? "Mặc định" : "Đặt mặc định"}</button>
+          <button type="button" data-track-action="remove" title="Xoá track này">Xoá</button>
+        </div>
+      </div>
+      <div class="subtitle-track-meta">
+        <label>Tên track<input data-track-field="title" value="${escapeHtml(track.title || "")}" /></label>
+        <label>Mã ngôn ngữ<input data-track-field="language" value="${escapeHtml(track.language || "und")}" maxlength="12" /></label>
+      </div>
+      <div class="subtitle-track-note">${escapeHtml(track.fileName || "Track phụ đề thêm")} · ${track.content.split(/\r?\n/).filter(Boolean).length} dòng</div>
+    `;
+    subtitleTrackList.appendChild(item);
+  });
+}
+
+function extraSubtitleTracksPayload() {
+  return state.extraSubtitleTracks
+    .filter((track) => String(track.content || "").trim())
+    .map((track) => ({
+      title: String(track.title || track.fileName || "Phụ đề thêm").trim(),
+      language: normalizeSubtitleLanguage(track.language),
+      content: String(track.content || ""),
+      file_name: String(track.fileName || "").trim() || null,
+      is_default: Boolean(track.isDefault),
+    }));
+}
+
+async function addExtraSubtitleFiles(files) {
+  const selectedFiles = Array.from(files || []).filter(Boolean);
+  if (!selectedFiles.length) {
+    return;
+  }
+  const importedTracks = [];
+  for (const file of selectedFiles) {
+    const content = await file.text();
+    if (!String(content || "").trim()) {
+      continue;
+    }
+    importedTracks.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title: subtitleTrackTitleFromFile(file.name, state.extraSubtitleTracks.length + importedTracks.length),
+      language: normalizeSubtitleLanguage(guessSubtitleLanguage(file.name)),
+      fileName: file.name,
+      content,
+      isDefault: false,
+    });
+  }
+  if (!importedTracks.length) {
+    setStatus("Không có file phụ đề hợp lệ để thêm track.", "warn");
+    return;
+  }
+  state.extraSubtitleTracks.push(...importedTracks);
+  persistExtraSubtitleTracks();
+  renderSubtitleTrackList();
+  renderArtifactLinks(state.job || { downloads: {} });
+  setStatus(`Đã thêm ${importedTracks.length} track phụ đề. Khi bấm MKV softsub, các track này sẽ được mux vào video.`, "ok");
+  showToast(`Đã thêm ${importedTracks.length} track phụ đề.`, "ok");
+}
+
+function clearExtraSubtitleTracksForJobChange(jobId) {
+  loadExtraSubtitleTracks(jobId);
+}
+
+function updateExtraSubtitleTrack(trackId, updates = {}) {
+  const track = state.extraSubtitleTracks.find((item) => String(item.id) === String(trackId));
+  if (!track) {
+    return;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, "title")) {
+    track.title = String(updates.title || "").trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, "language")) {
+    track.language = normalizeSubtitleLanguage(updates.language);
+  }
+  persistExtraSubtitleTracks();
+}
+
+function removeExtraSubtitleTrack(trackId) {
+  state.extraSubtitleTracks = state.extraSubtitleTracks.filter((track) => String(track.id) !== String(trackId));
+  persistExtraSubtitleTracks();
+  renderSubtitleTrackList();
+  renderArtifactLinks(state.job || { downloads: {} });
+  setStatus("Đã xoá track phụ đề thêm.", "ok");
+}
+
+function setDefaultExtraSubtitleTrack(trackId) {
+  state.extraSubtitleTracks = state.extraSubtitleTracks.map((track) => ({
+    ...track,
+    isDefault: String(track.id) === String(trackId) ? !track.isDefault : false,
+  }));
+  persistExtraSubtitleTracks();
+  renderSubtitleTrackList();
+  setStatus(
+    state.extraSubtitleTracks.some((track) => track.isDefault)
+      ? "Đã đặt track phụ đề thêm làm mặc định khi mở MKV."
+      : "Đã bỏ mặc định track thêm, MKV sẽ mặc định phụ đề tiếng Việt.",
+    "ok",
+  );
 }
 
 function statusLabel(status) {
@@ -1194,8 +1384,14 @@ function renderArtifactLinks(job) {
   setDownloadLink(vttLink, job.downloads?.subtitle_vtt);
   setDownloadLink(jsonLink, job.downloads?.transcript_json);
   setRenderActionLink(hardsubLink, canRenderVideo, "Xuất lại MP4 phụ đề từ nội dung đang sửa");
-  setRenderActionLink(softsubLink, canRenderVideo, "Xuất MKV softsub gồm phụ đề gốc và phụ đề tiếng Việt");
-  setDownloadLink(softsubCommandLink, job.downloads?.video_softsub_ffmpeg);
+  const extraTrackCount = state.extraSubtitleTracks.length;
+  setRenderActionLink(
+    softsubLink,
+    canRenderVideo,
+    extraTrackCount
+      ? `Xuất MKV softsub gồm phụ đề gốc, tiếng Việt và ${extraTrackCount} track thêm`
+      : "Xuất MKV softsub gồm phụ đề gốc và phụ đề tiếng Việt",
+  );
   setRenderActionLink(voiceoverLink, canRenderVideo, "Xuất lại MP4 thuyết minh từ phụ đề đang sửa");
 }
 
@@ -1434,6 +1630,7 @@ function renderInspector() {
 function renderAll() {
   renderTimeline();
   renderScriptList();
+  renderSubtitleTrackList();
   renderInspector();
   setPreviewButtons();
   applyPlaybackHighlight(videoPreview.currentTime || 0);
@@ -1521,8 +1718,13 @@ function applyPlaybackHighlight(currentTime) {
 }
 
 function applyJobState(job) {
+  const previousJobId = state.job?.job_id || state.jobId;
+  const isJobChanged = previousJobId !== job.job_id;
   state.job = job;
   state.jobId = job.job_id;
+  if (isJobChanged) {
+    clearExtraSubtitleTracksForJobChange(job.job_id);
+  }
   const restoredDraft = applySubtitleDraftIfAvailable(job);
   if (!state.dirty || !state.segments.length) {
     state.segments = cloneSegments(job.segments);
@@ -1637,7 +1839,6 @@ async function loadJob(jobId) {
     return;
   }
   stopPolling();
-  state.jobId = jobId;
   state.selectedSegmentId = null;
   state.segments = [];
   setDirty(false, { clearDraft: false });
@@ -1664,6 +1865,7 @@ function clearSelectedJob() {
   videoName.textContent = "Chưa chọn video";
   languageBadge.textContent = "ngôn ngữ gốc: --";
   progressBadge.textContent = "0%";
+  state.extraSubtitleTracks = [];
   updateRenderProgress(null);
   updateStopJobButton(null);
   if (translateSubtitleBtn) {
@@ -1890,11 +2092,20 @@ async function renderSoftsubFromCurrentSubtitles() {
   if (!state.jobId || softsubLink.classList.contains("disabled")) {
     return;
   }
-  setStatus("Đang xuất MKV softsub gồm nhiều track phụ đề...", "neutral");
+  const coverEnabled = Number(state.subtitleStyle.coverOpacity || 0) > 0;
+  setStatus(
+    coverEnabled
+      ? "Đang xuất MKV softsub có che/blur chữ gốc, bước này sẽ lâu hơn vì cần render lại hình..."
+      : "Đang xuất MKV softsub gồm nhiều track phụ đề...",
+    "neutral",
+  );
   await runRenderWithDestination(
     `/api/jobs/${state.jobId}/render/softsub`,
     "video_softsub",
-    subtitleStylePayload(),
+    {
+      ...subtitleStylePayload(),
+      extra_subtitle_tracks: extraSubtitleTracksPayload(),
+    },
   );
 }
 
@@ -2147,6 +2358,60 @@ subtitleFileInput.addEventListener("change", async () => {
     showToast(userMessage(error.message), "error");
   }
 });
+
+if (addSubtitleTrackBtn && extraSubtitleFileInput) {
+  addSubtitleTrackBtn.addEventListener("click", () => {
+    extraSubtitleFileInput.click();
+  });
+}
+
+if (extraSubtitleFileInput) {
+  extraSubtitleFileInput.addEventListener("change", async () => {
+    try {
+      await addExtraSubtitleFiles(extraSubtitleFileInput.files || []);
+    } catch (error) {
+      setStatus(userMessage(error.message), "error");
+      showToast(userMessage(error.message), "error");
+    } finally {
+      extraSubtitleFileInput.value = "";
+    }
+  });
+}
+
+if (subtitleTrackList) {
+  subtitleTrackList.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-track-action]");
+    if (!button) {
+      return;
+    }
+    const item = button.closest(".subtitle-track-item");
+    const trackId = item?.dataset.id;
+    if (!trackId) {
+      return;
+    }
+    if (button.dataset.trackAction === "remove") {
+      removeExtraSubtitleTrack(trackId);
+    }
+    if (button.dataset.trackAction === "default") {
+      setDefaultExtraSubtitleTrack(trackId);
+    }
+  });
+
+  subtitleTrackList.addEventListener("change", (event) => {
+    const input = event.target.closest("input[data-track-field]");
+    if (!input) {
+      return;
+    }
+    const item = input.closest(".subtitle-track-item");
+    const trackId = item?.dataset.id;
+    if (!trackId) {
+      return;
+    }
+    updateExtraSubtitleTrack(trackId, { [input.dataset.trackField]: input.value });
+    renderSubtitleTrackList();
+    renderArtifactLinks(state.job || { downloads: {} });
+  });
+}
 
 videoZoomRange.addEventListener("input", () => {
   applyVideoZoom(videoZoomRange.value);

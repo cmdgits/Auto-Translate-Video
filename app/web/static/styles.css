@@ -1280,6 +1280,129 @@ body.dragging * {
   overflow: hidden;
 }
 
+.subtitle-track-panel {
+  flex: 0 0 auto;
+}
+
+.track-panel-title {
+  align-items: center;
+}
+
+.track-panel-title .mini-button {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #24415f;
+  font-weight: 800;
+}
+
+.track-panel-title .mini-button:hover {
+  background: #eaf3ff;
+  color: #075985;
+}
+
+.track-panel-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.subtitle-track-list {
+  display: grid;
+  gap: 8px;
+}
+
+.subtitle-track-item {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.subtitle-track-head,
+.subtitle-track-actions,
+.subtitle-track-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.subtitle-track-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitle-track-actions {
+  margin-left: auto;
+}
+
+.subtitle-track-actions button,
+.subtitle-track-default {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid #dbe4ef;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #24415f;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.subtitle-track-actions button:hover,
+.subtitle-track-default:hover,
+.subtitle-track-default.active {
+  border-color: rgba(0, 198, 247, 0.55);
+  background: #eaf3ff;
+  color: #075985;
+}
+
+.subtitle-track-meta {
+  flex-wrap: wrap;
+}
+
+.subtitle-track-meta label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.subtitle-track-meta label:first-child {
+  flex: 1 1 150px;
+}
+
+.subtitle-track-meta label:last-child {
+  flex: 0 0 86px;
+}
+
+.subtitle-track-meta input {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px 8px;
+  color: var(--text);
+}
+
+.subtitle-track-note {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .script-list {
   display: grid;
   gap: 8px;
