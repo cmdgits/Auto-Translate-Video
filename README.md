@@ -1,246 +1,317 @@
 # Auto Translate Video
 
-He thong ban dau de tach audio tu video, chay speech-to-text, dich subtitle sang tieng Viet, xuat `.srt`/`.vtt`, burn subtitle truc tiep vao video, va tao voice-over tieng Viet. Du an co ca `CLI` va `web UI` mot trang theo bo cuc editor toi mau, lay cam hung tu CapCut.
+Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh phụ đề và xuất video hoàn chỉnh ngay trên máy tính cá nhân. Dự án hỗ trợ giao diện web kiểu trình dựng video, kèm CLI cho người muốn xử lý bằng dòng lệnh.
 
-## Tinh nang hien co
+Ứng dụng tập trung vào quy trình thực tế: tải video lên, nhận diện giọng nói, dịch phụ đề, chỉnh sửa trực tiếp trên timeline, làm mờ phụ đề gốc nếu cần, xuất video có phụ đề hoặc video thuyết minh tiếng Việt.
 
-- Upload hoac xu ly video local.
-- `ffprobe` doc metadata video.
-- `ffmpeg` tach audio sang `.wav` 16k mono.
-- `faster-whisper` chay speech-to-text va auto detect language.
-- Dich subtitle qua backend `echo`, `libretranslate`, `gpt`, `gemini`, hoac `llm-http`.
-- Xuat `transcript.vi.json`, `subtitles.vi.srt`, `subtitles.vi.vtt`.
-- Burn subtitle truc tiep vao video bang `ffmpeg`.
-- Tao voice-over tieng Viet bang `edge-tts`, mix voi audio goc, va render video moi.
-- Web UI tieng Viet co timeline subtitle, subtitle overlay, inspector clip, drag/trim timing, preview video va render actions.
-- Timeline editor ho tro split clip tai playhead va merge voi clip ke ben.
-- Web UI co batch upload, in-process queue worker, danh sach recent jobs va nut resume job dang queued/running.
+## Tính Năng Chính
 
-## Kien truc chinh
+- Tải lên một hoặc nhiều video và theo dõi tác vụ gần đây.
+- Tự động tách âm thanh, nhận diện lời thoại bằng `faster-whisper` và tạo phụ đề theo thời gian.
+- Dịch phụ đề sang tiếng Việt bằng nhiều backend như `echo`, `mymemory`, `libretranslate`, `gpt`, `gemini` hoặc `llm-http`.
+- Chỉnh sửa phụ đề trực tiếp trên timeline; bấm vào đoạn timeline sẽ chuyển video tới đúng đoạn đó.
+- Phóng to, thu nhỏ video và timeline để canh vị trí, thời gian hiển thị phụ đề dễ hơn.
+- Tùy chỉnh kích thước, vị trí và vùng hiển thị phụ đề trên video.
+- Làm mờ hoặc che vùng chữ gốc bằng hiệu ứng blur/mask trước khi phủ phụ đề mới.
+- Tự lưu nháp phụ đề trên trình duyệt để tránh mất nội dung khi đang sửa.
+- Có nút dừng tác vụ khi dịch, tạo phụ đề hoặc render quá lâu.
+- Hiển thị thanh tiến trình phần trăm cho các tác vụ dịch, tạo thuyết minh và xuất video.
+- Lưu phụ đề gốc, lưu phụ đề đã dịch, xuất video phụ đề `.mp4` và xuất video thuyết minh `.mp4`.
+- Giao diện toolbar tự xuống dòng gọn hơn khi dùng trên màn hình nhỏ.
 
-- `app/core/pipeline.py`: orchestration pipeline.
-- `app/media/*`: `ffprobe` va `ffmpeg`.
-- `app/asr/faster_whisper_backend.py`: speech-to-text.
-- `app/translate/*`: translator backend.
-- `app/subtitles/*`: format segment va writer cho SRT/VTT.
-- `app/tts/*`: sinh TTS va mix voice-over.
-- `app/web/*`: giao dien editor va API.
-- `app/cli.py`: entrypoint CLI.
+## Yêu Cầu Hệ Thống
 
-## Yeu cau he thong
+- Windows 10/11 được khuyến nghị.
+- Python `3.12` được khuyến nghị. Dự án hỗ trợ Python `>=3.11,<3.15`, nhưng không nên dùng Python `3.14` cho web UI trên Windows vì `faster-whisper`/`ctranslate2` có thể lỗi.
+- FFmpeg và FFprobe phải dùng được bằng lệnh `ffmpeg` và `ffprobe`, hoặc được cấu hình trong `config.yaml`.
+- Cần Internet nếu dùng dịch qua Gemini, OpenAI, LibreTranslate online hoặc tạo giọng đọc bằng `edge-tts`.
+- GPU NVIDIA là tùy chọn; nếu có, hệ thống có thể tự chọn `cuda` khi phù hợp.
 
-- Python `3.11` hoac `3.12` duoc khuyen nghi cho `faster-whisper`.
-- FFmpeg phai duoc cai va dua vao `PATH`.
-- Tren GPU NVIDIA, pipeline co the auto chon `cuda` neu `nvidia-smi` ton tai.
+## Cài Đặt Nhanh Trên Windows
 
-Luu y:
-- Workspace hien tai dang dung `Python 3.14.3`, nhung `faster-whisper` thuong on dinh hon o `3.11/3.12`.
-- Hien tai may nay chua co `ffmpeg` trong `PATH`.
-
-## Cai dat
+### 1. Tải mã nguồn
 
 ```powershell
-python -m venv .venv
+git clone https://github.com/cmdgits/Auto-Translate-Video.git
+cd Auto-Translate-Video
+```
+
+### 2. Tạo môi trường Python
+
+```powershell
+py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e .[dev]
-Copy-Item .env.example .env
-Copy-Item config.example.yaml config.yaml
+pip install -e .
 ```
 
-Neu muon chi dinh config rieng:
+Nếu máy chưa có Python 3.12, hãy cài Python 3.12 trước rồi chạy lại các lệnh trên.
+
+### 3. Cấu hình ứng dụng
 
 ```powershell
-$env:AUTOTRANSLATE_CONFIG="config.yaml"
+Copy-Item config.example.yaml config.yaml
+Copy-Item .env.example .env
 ```
 
-Mac dinh, app se uu tien `config.yaml` neu file nay ton tai trong workspace.
+Sau đó mở `config.yaml` hoặc `.env` để điền API key nếu muốn dùng Gemini, OpenAI hoặc backend LLM khác.
 
-## Cai FFmpeg tren Windows
+### 4. Cài FFmpeg
 
-1. Tai FFmpeg ban static cho Windows.
-2. Giai nen, vi du vao `C:\ffmpeg`.
-3. Them `C:\ffmpeg\bin` vao `PATH`.
-4. Kiem tra lai:
+Tải FFmpeg bản Windows, giải nén và thêm thư mục `bin` vào `PATH`. Kiểm tra bằng lệnh:
 
 ```powershell
 ffmpeg -version
 ffprobe -version
 ```
 
-## Cach dung CLI
+Nếu không muốn thêm vào `PATH`, hãy sửa trực tiếp trong `config.yaml`:
 
-Xem metadata:
-
-```powershell
-python -m app.main inspect --input "C:\videos\sample.mp4"
+```yaml
+ffmpeg_bin: C:\ffmpeg\bin\ffmpeg.exe
+ffprobe_bin: C:\ffmpeg\bin\ffprobe.exe
 ```
 
-Xu ly video va xuat subtitle:
+## Chạy Giao Diện Web
 
-```powershell
-python -m app.main process --input "C:\videos\sample.mp4"
-```
-
-Xu ly video va render burn subtitle ngay:
-
-```powershell
-python -m app.main process --input "C:\videos\sample.mp4" --hardsub
-```
-
-Xu ly video va tao voice-over ngay:
-
-```powershell
-python -m app.main process `
-  --input "C:\videos\sample.mp4" `
-  --voiceover `
-  --voice-name "vi-VN-HoaiMyNeural"
-```
-
-Dung LibreTranslate:
-
-```powershell
-python -m app.main process `
-  --input "C:\videos\sample.mp4" `
-  --translator libretranslate `
-  --libretranslate-url "http://localhost:5000"
-```
-
-Dung endpoint OpenAI-compatible:
-
-```powershell
-python -m app.main process `
-  --input "C:\videos\sample.mp4" `
-  --translator llm-http `
-  --llm-base-url "https://your-endpoint/v1" `
-  --llm-api-key "YOUR_KEY" `
-  --llm-model "your-model-name"
-```
-
-Dung OpenAI GPT truc tiep:
-
-```powershell
-$env:OPENAI_API_KEY="YOUR_OPENAI_KEY"
-python -m app.main process `
-  --input "C:\videos\sample.mp4" `
-  --translator gpt `
-  --openai-model "gpt-4.1-mini"
-```
-
-Dung Gemini:
-
-```powershell
-$env:GEMINI_API_KEY="YOUR_GEMINI_KEY"
-python -m app.main process `
-  --input "C:\videos\sample.mp4" `
-  --translator gemini `
-  --gemini-model "gemini-2.5-flash"
-```
-
-Render lai hardsub cho job da co subtitle:
-
-```powershell
-python -m app.main render-hardsub --job-id "<job_id>"
-```
-
-Render lai voice-over cho job da co subtitle:
-
-```powershell
-python -m app.main render-voiceover `
-  --job-id "<job_id>" `
-  --voice-name "vi-VN-HoaiMyNeural"
-```
-
-Ket qua moi job se nam trong:
+Nếu bạn đang dùng bộ chạy có sẵn trong thư mục `tools\Python312`, có thể mở nhanh bằng cách nhấp đúp:
 
 ```text
-workspace_data/jobs/<job_id>/
+run_web.bat
 ```
 
-## Cach dung Web UI
-
-```powershell
-tools\Python312\python.exe -m app.main web --host 127.0.0.1 --port 8001
-```
-
-Hoac chay nhanh bang script co san:
+Hoặc chạy bằng PowerShell:
 
 ```powershell
 .\run_web.ps1
 ```
 
-Neu PowerShell chan script, bam dup `run_web.bat` hoac chay:
+Nếu cài bằng môi trường `.venv`, chạy:
 
 ```powershell
-.\run_web.bat
+.venv\Scripts\Activate.ps1
+python -m app.main web --host 127.0.0.1 --port 8001
 ```
 
-Tren Windows nen dung dung Python di kem trong `tools\Python312`. Neu chay bang Python he thong 3.14, buoc nhan dang giong noi co the loi `Could not find module ... ctranslate2.dll`.
+Sau khi chạy, mở trình duyệt tại:
 
-Mo `http://127.0.0.1:8001`
+```text
+http://127.0.0.1:8001
+```
 
-Giao dien co:
-- toan bo nhan, nut va thong bao chinh bang tieng Viet de de thao tac
-- panel trai giong editor
-- preview video o giua
-- panel setting pipeline ben phai
-- batch upload nhieu video va recent jobs queue
-- muc `Cai dat API dich` rieng de luu OpenAI/Gemini/LLM/LibreTranslate tren trinh duyet, co thong bao nho khi luu va tu nap lai sau khi reload
-- hop thong bao nho hoi `Luu`, `Khong luu` hoac `Huy` khi co phu de chua luu ma ban sap doi tac vu/xuat video/tao tac vu moi
-- timeline subtitle co the drag va trim
-- split subtitle tai playhead hoac merge voi clip truoc/sau
-- inspector clip de sua source, translated, subtitle, start va end
-- nut save timeline, render burn subtitle, render voice-over
+## Quy Trình Sử Dụng Trên Web
 
-## Translator backend
+### 1. Tải video lên
 
-### 1. `echo`
+- Bấm nút nhập video hoặc kéo thả video vào giao diện.
+- Có thể chọn nhiều video để tạo hàng đợi xử lý.
+- Mỗi video sẽ được lưu thành một tác vụ riêng trong `workspace_data/jobs`.
 
-Dung de test UI/pipeline. Khong dich that.
+### 2. Chọn cách dịch
 
-### 2. `libretranslate`
+- Mở phần cài đặt API nếu muốn dùng Gemini, OpenAI hoặc LLM riêng.
+- Chọn ngôn ngữ đích là tiếng Việt.
+- Bấm dịch để hệ thống nhận diện lời thoại và tạo phụ đề tiếng Việt.
 
-Hop voi server tu host. Can dien:
-- `libretranslate_url`
-- `libretranslate_api_key` neu server yeu cau
+### 3. Chỉnh phụ đề
 
-### 3. `llm-http`
+- Bấm vào một đoạn trên timeline để video nhảy tới đúng thời điểm của đoạn đó.
+- Sửa trực tiếp nội dung phụ đề trong vùng chỉnh sửa.
+- Điều chỉnh thời gian bắt đầu/kết thúc nếu phụ đề lệch so với video.
+- Dùng thanh zoom timeline để kéo giãn hoặc thu gọn khoảng thời gian hiển thị.
+- Bản nháp phụ đề sẽ được tự lưu trên trình duyệt trong quá trình chỉnh.
 
-Backend HTTP cho endpoint tuong thich `chat/completions`. Can:
-- `llm_base_url`
-- `llm_model`
-- `llm_api_key` neu endpoint yeu cau
+### 4. Chỉnh hiển thị trên video
 
-### 4. `gpt`
+- Chọn chế độ xem phụ đề để kiểm tra chữ hiển thị trên video.
+- Tùy chỉnh cỡ chữ, vị trí, vùng đặt phụ đề và độ che phủ chữ gốc.
+- Nếu video có chữ gốc, có thể dùng blur/mask để làm mờ vùng chữ cũ thay vì phủ màu cứng.
+- Khi phóng to hoặc thu nhỏ video, phụ đề sẽ co giãn theo khung video để dễ canh chỉnh.
 
-Backend OpenAI GPT truc tiep qua Chat Completions-compatible endpoint. Can:
-- `OPENAI_API_KEY` hoac `AUTOTRANSLATE_OPENAI_API_KEY`
-- `openai_model`, mac dinh goi y `gpt-4.1-mini`
-- `openai_base_url`, mac dinh `https://api.openai.com/v1`
+### 5. Lưu và xuất kết quả
 
-### 5. `gemini`
+- Lưu phụ đề gốc ra file `.srt` nếu cần giữ bản nhận diện ban đầu.
+- Lưu phụ đề đã dịch ra file `.srt` sau khi chỉnh sửa.
+- Xuất video phụ đề để tạo file `.mp4` có phụ đề tiếng Việt được gắn vào video.
+- Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
+- Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
 
-Backend Google Gemini qua `generateContent`. Can:
-- `GEMINI_API_KEY` hoac `AUTOTRANSLATE_GEMINI_API_KEY`
-- `gemini_model`, mac dinh goi y `gemini-2.5-flash`
-- `gemini_base_url`, mac dinh `https://generativelanguage.googleapis.com/v1beta`
+## Cấu Hình Dịch Và API
 
-Docs chinh thuc:
-- OpenAI Chat Completions API: https://platform.openai.com/docs/api-reference/chat/create
-- Gemini Generate Content API: https://ai.google.dev/api/generate-content
+Các cấu hình chính nằm trong `config.yaml`:
 
-## Han che cua ban dau
+```yaml
+translation:
+  backend: gemini
+  target_language: vi
+  gemini_api_key: YOUR_GEMINI_API_KEY
+  gemini_model: gemini-2.5-flash
+```
 
-- Queue worker hien la in-process theo web app, chua tach thanh worker service rieng.
-- Voice-over hien tai dung `edge-tts`, chua co lip-sync hay speaker cloning.
-- Burn subtitle va voice-over phu thuoc `ffmpeg` trong `PATH`.
-- Timeline editor hien chua co waveform audio.
+Các backend dịch thường dùng:
 
-## Huong phat trien tiep
+- `echo`: không dịch, dùng để kiểm tra quy trình hoặc giữ nguyên văn bản gốc.
+- `mymemory`: dịch online đơn giản, không cần cấu hình phức tạp.
+- `libretranslate`: dùng LibreTranslate public hoặc server riêng.
+- `gpt`: dùng OpenAI API.
+- `gemini`: dùng Google Gemini API.
+- `llm-http`: dùng server tương thích OpenAI API, ví dụ một số server LLM nội bộ.
 
-1. Tach queue worker thanh service rieng va them retry/backoff.
-2. Them render softsub va mux nhieu track subtitle.
-3. Them glossary cho term ky thuat.
-4. Them waveform/timeline chinh sua subtitle nang cao hon.
-5. Them TTS backend chat luong cao hon va speaker control.
-"# Auto-Translale-Video" 
+Lưu ý khi dùng Gemini:
+
+- Tên model nên để dạng ngắn như `gemini-2.5-flash`, không nhập kèm tiền tố `models/` nếu giao diện hoặc cấu hình đã tự xử lý.
+- Nếu gặp lỗi `unexpected model name format`, hãy kiểm tra lại tên model trong phần cài đặt API.
+
+## Cấu Hình Giọng Đọc
+
+Giọng đọc mặc định nằm trong `config.yaml`:
+
+```yaml
+tts:
+  backend: edge-tts
+  voice: vi-VN-HoaiMyNeural
+  background_audio_gain: 0.24
+  voiceover_gain: 1.4
+```
+
+Một số giọng tiếng Việt thường dùng:
+
+- `vi-VN-HoaiMyNeural`
+- `vi-VN-NamMinhNeural`
+
+Khi xuất video thuyết minh, hệ thống sẽ dùng nội dung phụ đề tiếng Việt hiện tại. Nếu bạn đã sửa phụ đề trên web, hãy lưu phụ đề trước khi render để video thuyết minh dùng đúng nội dung mới nhất.
+
+## Thư Mục Kết Quả
+
+Mỗi tác vụ được lưu trong thư mục:
+
+```text
+workspace_data/jobs/<job_id>/
+```
+
+Các file thường gặp:
+
+```text
+workspace_data/jobs/<job_id>/data/transcript.vi.json
+workspace_data/jobs/<job_id>/subtitles/subtitles.original.srt
+workspace_data/jobs/<job_id>/subtitles/subtitles.vi.srt
+workspace_data/jobs/<job_id>/subtitles/subtitles.vi.vtt
+workspace_data/jobs/<job_id>/subtitles/subtitles.vi.ass
+workspace_data/jobs/<job_id>/renders/video.hardsub.mp4
+workspace_data/jobs/<job_id>/renders/video.voiceover.vi.mp4
+```
+
+Ý nghĩa file:
+
+- `subtitles.original.srt`: phụ đề gốc nhận diện từ video.
+- `subtitles.vi.srt`: phụ đề tiếng Việt sau dịch hoặc sau chỉnh sửa.
+- `subtitles.vi.ass`: phụ đề định dạng ASS dùng khi render video.
+- `video.hardsub.mp4`: video đã gắn phụ đề tiếng Việt.
+- `video.voiceover.vi.mp4`: video thuyết minh tiếng Việt.
+
+## Dùng Bằng Dòng Lệnh
+
+Xem thông tin video:
+
+```powershell
+python -m app.main inspect --input "C:\videos\sample.mp4"
+```
+
+Xử lý video và tạo phụ đề:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4"
+```
+
+Xử lý video và xuất luôn video phụ đề:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4" --hardsub
+```
+
+Xử lý video và xuất luôn video thuyết minh:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4" --voiceover --voice-name "vi-VN-HoaiMyNeural"
+```
+
+Render lại video phụ đề từ một tác vụ đã có:
+
+```powershell
+python -m app.main render-hardsub --job-id "<job_id>"
+```
+
+Render lại video thuyết minh từ một tác vụ đã có:
+
+```powershell
+python -m app.main render-voiceover --job-id "<job_id>" --voice-name "vi-VN-HoaiMyNeural"
+```
+
+Chạy web UI:
+
+```powershell
+python -m app.main web --host 127.0.0.1 --port 8001
+```
+
+## Cấu Trúc Dự Án
+
+```text
+app/
+  asr/          Nhận diện giọng nói bằng faster-whisper
+  core/         Điều phối pipeline, job, trạng thái và hủy tác vụ
+  media/        FFmpeg, FFprobe, render video và xử lý âm thanh
+  subtitles/    Tạo SRT, VTT, ASS và định dạng đoạn phụ đề
+  translate/    Các backend dịch phụ đề
+  tts/          Tạo giọng đọc và mix thuyết minh
+  web/          FastAPI, giao diện web, CSS và JavaScript
+config.example.yaml  File cấu hình mẫu
+run_web.bat          File chạy nhanh web UI trên Windows
+run_web.ps1          File chạy web UI bằng PowerShell
+workspace_data/      Dữ liệu upload, tác vụ và kết quả render
+```
+
+## Lưu Ý Khi Đưa Lên GitHub
+
+Không nên đưa các file nặng hoặc dữ liệu riêng tư lên GitHub. Dự án đã bỏ qua các mục sau trong `.gitignore`:
+
+- `.env`, `config.yaml`: có thể chứa API key.
+- `workspace_data/`: chứa video, phụ đề và kết quả xuất.
+- `tools/Python312/`, `tools/ffmpeg/`: bộ chạy và công cụ nặng.
+- `*.zip`, `*.exe`: file cài đặt hoặc file nén lớn.
+
+Nếu cần chia sẻ dự án, chỉ nên đẩy mã nguồn, file cấu hình mẫu và hướng dẫn sử dụng.
+
+## Xử Lý Lỗi Thường Gặp
+
+### Không chạy được `run_web.bat`
+
+Nguyên nhân thường là thiếu `tools\Python312\python.exe`. Hãy cài Python 3.12 và chạy bằng môi trường `.venv`, hoặc đặt Python portable đúng vào thư mục `tools\Python312`.
+
+### Báo lỗi không tìm thấy FFmpeg
+
+Kiểm tra:
+
+```powershell
+ffmpeg -version
+ffprobe -version
+```
+
+Nếu hai lệnh trên không chạy, hãy cài FFmpeg hoặc sửa đường dẫn `ffmpeg_bin` và `ffprobe_bin` trong `config.yaml`.
+
+### Dịch Gemini lỗi 400
+
+Kiểm tra API key, base URL và tên model. Tên model nên để dạng `gemini-2.5-flash`. Không nên nhập thừa dạng `models/gemini-2.5-flash` nếu hệ thống đã tự thêm định dạng cần thiết.
+
+### Video xuất ra chưa đúng phụ đề đã sửa
+
+Hãy lưu phụ đề sau khi chỉnh rồi mới render lại video phụ đề hoặc video thuyết minh. Video thuyết minh sẽ dựa trên phụ đề tiếng Việt hiện tại của tác vụ.
+
+### Giao diện web không thấy cập nhật
+
+Thử tải lại trang bằng `Ctrl + F5` để xóa cache trình duyệt.
+
+## Ghi Chú Bảo Mật
+
+- Không chia sẻ `.env` hoặc `config.yaml` nếu trong đó có API key.
+- Không upload video riêng tư lên dịch vụ bên ngoài nếu chưa kiểm tra backend dịch đang dùng.
+- Nếu cần xử lý nội bộ, hãy dùng backend cục bộ hoặc server LLM riêng thông qua `llm-http`.
