@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-33" />
+  </head>
+  <body>
+    <div class="capcut-shell">
+      <aside class="app-rail">
+        <div class="rail-logo">⌁</div>
+        <nav class="rail-tabs" aria-label="Công cụ chính">
+          <button class="rail-tab active" type="button"><span>☁</span><small>Phương tiện</small></button>
+          <button class="rail-tab" type="button"><span>▣</span><small>Mẫu</small></button>
+          <button class="rail-tab" type="button"><span>▥</span><small>Kho video</small></button>
+          <button class="rail-tab" type="button"><span>▧</span><small>Hình ảnh</small></button>
+          <button class="rail-tab" type="button"><span>♫</span><small>Âm thanh</small></button>
+        </nav>
+        <div class="rail-bottom">
+          <button class="rail-icon" type="button">✎</button>
+          <button class="rail-icon" type="button">⌨</button>
+        </div>
+      </aside>
+
+      <aside class="media-panel">
+        <header class="user-strip">
+          <span class="avatar">U</span>
+          <strong>Auto Translate</strong>
+          <button type="button">☰</button>
+        </header>
+
+        <form id="jobForm" class="upload-form">
+          <label class="upload-button" for="videoFile">☁ Tải lên</label>
+          <input id="videoFile" name="file" type="file" accept="video/*" multiple required />
+
+          <section class="voice-settings-card">
+            <p class="eyebrow">Thuyết minh</p>
+            <label class="field">
+              <span>Giọng đọc</span>
+              <select id="voiceNameInput" name="voice_name">
+                <optgroup label="Tiếng Việt">
+                  <option value="vi-VN-HoaiMyNeural" {% if default_voice == "vi-VN-HoaiMyNeural" %}selected{% endif %}>Nữ Việt Nam - Hoài My</option>
+                  <option value="vi-VN-NamMinhNeural" {% if default_voice == "vi-VN-NamMinhNeural" %}selected{% endif %}>Nam Việt Nam - Nam Minh</option>
+                </optgroup>
+                <optgroup label="Tiếng Anh">
+                  <option value="en-US-JennyNeural" {% if default_voice == "en-US-JennyNeural" %}selected{% endif %}>Nữ Mỹ - Jenny</option>
+                  <option value="en-US-AriaNeural" {% if default_voice == "en-US-AriaNeural" %}selected{% endif %}>Nữ Mỹ - Aria</option>
+                  <option value="en-US-GuyNeural" {% if default_voice == "en-US-GuyNeural" %}selected{% endif %}>Nam Mỹ - Guy</option>
+                  <option value="en-US-DavisNeural" {% if default_voice == "en-US-DavisNeural" %}selected{% endif %}>Nam Mỹ - Davis</option>
+                  <option value="en-GB-SoniaNeural" {% if default_voice == "en-GB-SoniaNeural" %}selected{% endif %}>Nữ Anh - Sonia</option>
+                  <option value="en-GB-RyanNeural" {% if default_voice == "en-GB-RyanNeural" %}selected{% endif %}>Nam Anh - Ryan</option>
+                </optgroup>
+                <optgroup label="Châu Á">
+                  <option value="zh-CN-XiaoxiaoNeural" {% if default_voice == "zh-CN-XiaoxiaoNeural" %}selected{% endif %}>Nữ Trung - Xiaoxiao</option>
+                  <option value="zh-CN-YunxiNeural" {% if default_voice == "zh-CN-YunxiNeural" %}selected{% endif %}>Nam Trung - Yunxi</option>
+                  <option value="ja-JP-NanamiNeural" {% if default_voice == "ja-JP-NanamiNeural" %}selected{% endif %}>Nữ Nhật - Nanami</option>
+                  <option value="ja-JP-KeitaNeural" {% if default_voice == "ja-JP-KeitaNeural" %}selected{% endif %}>Nam Nhật - Keita</option>
+                  <option value="ko-KR-SunHiNeural" {% if default_voice == "ko-KR-SunHiNeural" %}selected{% endif %}>Nữ Hàn - SunHi</option>
+                  <option value="ko-KR-InJoonNeural" {% if default_voice == "ko-KR-InJoonNeural" %}selected{% endif %}>Nam Hàn - InJoon</option>
+                  <option value="th-TH-PremwadeeNeural" {% if default_voice == "th-TH-PremwadeeNeural" %}selected{% endif %}>Nữ Thái - Premwadee</option>
+                  <option value="th-TH-NiwatNeural" {% if default_voice == "th-TH-NiwatNeural" %}selected{% endif %}>Nam Thái - Niwat</option>
+                  <option value="id-ID-GadisNeural" {% if default_voice == "id-ID-GadisNeural" %}selected{% endif %}>Nữ Indonesia - Gadis</option>
+                  <option value="id-ID-ArdiNeural" {% if default_voice == "id-ID-ArdiNeural" %}selected{% endif %}>Nam Indonesia - Ardi</option>
+                </optgroup>
+                <optgroup label="Châu Âu">
+                  <option value="fr-FR-DeniseNeural" {% if default_voice == "fr-FR-DeniseNeural" %}selected{% endif %}>Nữ Pháp - Denise</option>
+                  <option value="fr-FR-HenriNeural" {% if default_voice == "fr-FR-HenriNeural" %}selected{% endif %}>Nam Pháp - Henri</option>
+                  <option value="de-DE-KatjaNeural" {% if default_voice == "de-DE-KatjaNeural" %}selected{% endif %}>Nữ Đức - Katja</option>
+                  <option value="de-DE-ConradNeural" {% if default_voice == "de-DE-ConradNeural" %}selected{% endif %}>Nam Đức - Conrad</option>
+                  <option value="es-ES-ElviraNeural" {% if default_voice == "es-ES-ElviraNeural" %}selected{% endif %}>Nữ Tây Ban Nha - Elvira</option>
+                  <option value="es-ES-AlvaroNeural" {% if default_voice == "es-ES-AlvaroNeural" %}selected{% endif %}>Nam Tây Ban Nha - Alvaro</option>
+                </optgroup>
+              </select>
+            </label>
+            <div class="time-grid compact-grid">
+              <label class="field"><span>Âm lượng giọng</span><input id="voiceGainInput" name="voiceover_gain" type="number" step="0.05" value="1.4" /></label>
+              <label class="field"><span>Âm nền gốc</span><input id="bedGainInput" name="background_audio_gain" type="number" step="0.05" value="0.24" /></label>
+            </div>
+          </section>
+
+          <div class="quick-settings">
+            <label class="field compact">
+              <span>Model nhận diện</span>
+              <select name="asr_model" id="asrModel">
+                <option value="tiny" {% if default_asr_model == "tiny" %}selected{% endif %}>tiny - nhanh nhất</option>
+                <option value="base" {% if default_asr_model == "base" %}selected{% endif %}>base - nhanh</option>
+                <option value="small" {% if default_asr_model == "small" %}selected{% endif %}>small</option>
+                <option value="medium" {% if default_asr_model == "medium" %}selected{% endif %}>medium</option>
+                <option value="large-v3" {% if default_asr_model == "large-v3" %}selected{% endif %}>large-v3</option>
+              </select>
+            </label>
+
+            <label class="field compact">
+              <span>Bộ dịch</span>
+              <select name="translator_backend" id="translatorBackend">
+                <option value="mymemory" {% if default_translator == "mymemory" %}selected{% endif %}>MyMemory - Miễn phí, không cần key</option>
+                <option value="gemini" {% if default_translator == "gemini" %}selected{% endif %}>Gemini - dịch tiếng Việt</option>
+                <option value="gpt" {% if default_translator in ["gpt", "openai"] %}selected{% endif %}>GPT / OpenAI</option>
+                <option value="llm-http" {% if default_translator in ["llm-http", "llm", "openai-compatible"] %}selected{% endif %}>LLM riêng (Ollama)</option>
+                <option value="libretranslate" {% if default_translator == "libretranslate" %}selected{% endif %}>LibreTranslate</option>
+                <option value="echo" {% if default_translator == "echo" %}selected{% endif %}>Không dịch</option>
+              </select>
+            </label>
+
+            <button class="primary-action full" type="submit">Tạo tác vụ</button>
+          </div>
+        </form>
+
+        <button class="settings-button full" id="apiSettingsToggle" type="button" aria-controls="apiSettingsPanel" aria-expanded="false">⚙ Cài đặt API dịch</button>
+
+        <section class="side-section">
+          <div class="section-title">
+            <span>Tác vụ gần đây</span>
+            <button class="mini-button" id="resumeJobsBtn" type="button">Chạy tiếp</button>
+          </div>
+          <div class="job-list" id="jobList">
+            <div class="script-empty">Tác vụ đang chờ sẽ hiện ở đây.</div>
+          </div>
+        </section>
+
+        <div class="api-settings-panel hidden" id="apiSettingsPanel" role="dialog" aria-label="Cài đặt API dịch">
+          <div class="api-settings-header">
+            <div>
+              <span>Cài đặt API dịch</span>
+              <small>Gemini, OpenAI, LLM riêng</small>
+            </div>
+            <button class="mini-button" id="apiSettingsClose" type="button">Đóng</button>
+          </div>
+          <form id="apiSettingsForm" class="stacked-form settings-grid">
+            <label class="field">
+              <span>Gemini API key</span>
+              <input name="gemini_api_key" type="password" placeholder="AIza..." autocomplete="off" />
+            </label>
+            <label class="field two-col">
+              <span>Gemini model</span>
+              <input name="gemini_model" type="text" value="gemini-2.5-flash" placeholder="gemini-2.5-flash" />
+            </label>
+            <label class="field two-col">
+              <span>Gemini base URL</span>
+              <input name="gemini_base_url" type="text" value="https://generativelanguage.googleapis.com/v1beta" />
+            </label>
+            <label class="field">
+              <span>OpenAI API key</span>
+              <input name="openai_api_key" type="password" placeholder="sk-..." autocomplete="off" />
+            </label>
+            <label class="field two-col">
+              <span>OpenAI model</span>
+              <input name="openai_model" type="text" value="gpt-4.1-mini" />
+            </label>
+            <label class="field two-col">
+              <span>OpenAI base URL</span>
+              <input name="openai_base_url" type="text" value="https://api.openai.com/v1" />
+            </label>
+            <label class="field">
+              <span>LLM base URL</span>
+              <input name="llm_base_url" type="text" placeholder="http://localhost:11434/v1" />
+            </label>
+            <label class="field two-col">
+              <span>LLM API key</span>
+              <input name="llm_api_key" type="password" placeholder="tuỳ chọn" autocomplete="off" />
+            </label>
+            <label class="field two-col">
+              <span>LLM model</span>
+              <input name="llm_model" type="text" placeholder="translator-model" />
+            </label>
+            <label class="field two-col">
+              <span>LibreTranslate URL</span>
+              <input name="libretranslate_url" type="text" placeholder="http://localhost:5000" />
+            </label>
+            <label class="field two-col">
+              <span>LibreTranslate key</span>
+              <input name="libretranslate_api_key" type="password" autocomplete="off" />
+            </label>
+            <button class="secondary-action" id="saveApiSettingsBtn" type="button">Lưu cài đặt API</button>
+            <span class="muted" id="apiSettingsStatus">Chỉ cần mở khi muốn đổi khóa hoặc model.</span>
+          </form>
+        </div>
+      </aside>
+
+      <main class="editor-main">
+        <header class="topbar">
+          <div class="topbar-status">
+            <span class="status-pill" id="languageBadge">ngôn ngữ gốc: --</span>
+            <span class="status-pill" id="progressBadge">0%</span>
+            <span class="status-pill" id="statusPill">Sẵn sàng</span>
+            <span class="dirty-pill" id="dirtyBadge">Đã lưu</span>
+          </div>
+          <div class="canvas-controls collapsed" id="canvasControls" aria-label="Điều chỉnh khung video">
+            <button class="canvas-controls-toggle" id="canvasControlsToggle" type="button" aria-expanded="false">⚙ Chỉnh</button>
+            <div class="canvas-controls-body">
+              <label class="zoom-control">
+                <span>Video</span>
+                <input id="videoZoomRange" type="range" min="60" max="180" step="5" value="100" />
+                <output id="videoZoomValue">100%</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Cỡ chữ</span>
+                <input id="subtitleSizeRange" type="range" min="8" max="64" step="1" value="32" />
+                <output id="subtitleSizeValue">32px</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Ngang</span>
+                <input id="subtitleXRange" type="range" min="10" max="90" step="1" value="50" />
+                <output id="subtitleXValue">50%</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Cao</span>
+                <input id="subtitleYRange" type="range" min="3" max="45" step="1" value="8" />
+                <output id="subtitleYValue">8%</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Che chữ gốc</span>
+                <select id="subtitleCoverModeSelect" aria-label="Kiểu che chữ gốc">
+                  <option value="blur" selected>Làm mờ</option>
+                  <option value="box">Phủ màu</option>
+                </select>
+                <input id="subtitleCoverRange" type="range" min="0" max="100" step="5" value="72" />
+                <output id="subtitleCoverValue">72%</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Vùng che</span>
+                <input id="subtitleCoverHeightRange" type="range" min="8" max="35" step="1" value="18" />
+                <output id="subtitleCoverHeightValue">18%</output>
+              </label>
+              <button class="ghost-button" id="videoFitBtn" type="button">Vừa khung</button>
+            </div>
+          </div>
+          <div class="render-progress hidden" id="renderProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-live="polite">
+            <span class="render-progress-label" id="renderProgressLabel">Đang xử lý 0%</span>
+            <div class="render-progress-track" aria-hidden="true">
+              <span id="renderProgressFill"></span>
+            </div>
+          </div>
+        </header>
+
+        <section class="canvas-area">
+          <h2 class="canvas-title" id="videoName">Chưa chọn video</h2>
+          <div class="canvas-frame" id="canvasFrame">
+            <video id="videoPreview" controls preload="metadata"></video>
+            <div class="original-subtitle-cover hidden" id="originalSubtitleCover"></div>
+            <div class="subtitle-overlay hidden" id="subtitleOverlay"></div>
+            <div class="empty-state" id="emptyState">
+              <strong>Tải video lên để bắt đầu</strong>
+              <span>Video xem trước sẽ hiển thị tại đây.</span>
+            </div>
+            <button class="canvas-resize-handle" id="canvasResizeHandle" type="button" aria-label="Kéo để phóng to hoặc thu nhỏ khung video"></button>
+          </div>
+
+        </section>
+
+        <section class="transport-bar">
+          <div class="artifact-bar">
+            <div class="toolbar-group import-group">
+              <input id="subtitleFile" class="toolbar-file-input" type="file" accept=".srt,.vtt,.json,text/plain,text/vtt,application/json" />
+              <button class="import-button compact-import" id="importSubtitleBtn" type="button">＋ Nhập phụ đề</button>
+            </div>
+            <div class="toolbar-group edit-action-group">
+              <button class="secondary-action" id="saveTimelineBtn" type="button">Lưu phụ đề</button>
+              <button class="secondary-action" id="translateSubtitleBtn" type="button">Dịch lại tiếng Việt</button>
+            </div>
+            <div class="toolbar-group file-format-group" aria-label="Tải file phụ đề">
+              <a class="artifact-link disabled" href="#" id="sourceSrtLink">Lưu phụ đề gốc</a>
+              <a class="artifact-link disabled" href="#" id="srtLink">Lưu phụ đề dịch</a>
+              <a class="artifact-link disabled" href="#" id="vttLink">VTT</a>
+              <a class="artifact-link disabled" href="#" id="jsonLink">JSON</a>
+            </div>
+            <div class="toolbar-group export-format-group" aria-label="Xuất video">
+              <a class="artifact-link disabled" href="#" id="hardsubLink">MP4 phụ đề</a>
+              <a class="artifact-link disabled" href="#" id="voiceoverLink">MP4 thuyết minh</a>
+            </div>
+          </div>
+          <div class="preview-switches toolbar-group">
+            <button class="ghost-button active" id="previewSourceBtn" type="button">Gốc</button>
+            <button class="ghost-button" id="previewHardsubBtn" type="button">Phụ đề</button>
+            <button class="ghost-button" id="previewVoiceoverBtn" type="button">Thuyết minh</button>
+          </div>
+        </section>
+
+        <section class="timeline-shell">
+          <div class="timeline-actions">
+            <label class="timeline-zoom-control toolbar-group">
+              <span>Khoảng cách</span>
+              <input id="timelineZoomRange" type="range" min="32" max="180" step="4" value="72" />
+              <output id="timelineZoomValue">72 px/s</output>
+            </label>
+
+            <span class="muted" id="timelineMeta">Chưa có bản nhận diện.</span>
+          </div>
+          <div class="timeline-track" id="timelineTrack">
+            <div class="timeline-ruler" id="timelineRuler"></div>
+            <div class="timeline-lane" id="timelineLane"></div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="inspector-panel">
+        <section class="inspector-card">
+          <p class="eyebrow">Đoạn phụ đề</p>
+          <h3 id="selectedClipTitle">Chưa chọn đoạn</h3>
+          <span class="muted" id="selectedClipRange">--</span>
+          <div class="time-grid">
+            <label class="field"><span>Bắt đầu</span><input id="segmentStart" type="number" step="0.05" /></label>
+            <label class="field"><span>Kết thúc</span><input id="segmentEnd" type="number" step="0.05" /></label>
+          </div>
+          <label class="field source-field"><span>Ngôn ngữ gốc</span><textarea id="segmentSource" rows="4"></textarea></label>
+          <label class="field hidden"><span>Bản dịch</span><textarea id="segmentTranslated" rows="4"></textarea></label>
+          <label class="field"><span>Phụ đề hiển thị</span><textarea id="segmentSubtitle" rows="4"></textarea></label>
+          <div class="button-grid narrow">
+            <button class="ghost-button" id="nudgeBackBtn" type="button">Lùi -0.10 giây</button>
+            <button class="ghost-button" id="nudgeForwardBtn" type="button">Tiến +0.10 giây</button>
+            <button class="ghost-button" id="useTranslatedBtn" type="button">Dùng bản dịch</button>
+            <button class="ghost-button" id="splitSegmentBtn" type="button">Tách tại vị trí phát</button>
+            <button class="ghost-button" id="mergePreviousBtn" type="button">Gộp đoạn trước</button>
+            <button class="ghost-button" id="mergeNextBtn" type="button">Gộp đoạn sau</button>
+          </div>
+        </section>
+
+        <section class="inspector-card script-panel">
+          <div class="section-title"><span>Danh sách phụ đề</span></div>
+          <div class="script-list" id="scriptList">
+            <div class="script-empty">Các dòng phụ đề sẽ hiện ở đây sau khi xử lý.</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="save-prompt hidden" id="savePrompt" role="dialog" aria-modal="true" aria-labelledby="savePromptTitle">
+      <div class="save-prompt-card">
+        <h3 id="savePromptTitle">Lưu thay đổi?</h3>
+        <p id="savePromptMessage">Bạn có thay đổi chưa lưu.</p>
+        <div class="save-prompt-actions">
+          <button class="ghost-button" id="savePromptCancelBtn" type="button">Hủy</button>
+          <button class="secondary-action" id="savePromptDiscardBtn" type="button">Không lưu</button>
+          <button class="primary-action" id="savePromptSaveBtn" type="button">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+    <script src="/static/app.js?v=capcut-layout-20260504-33" defer></script>
+  </body>
+</html>

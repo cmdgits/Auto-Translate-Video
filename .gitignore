@@ -1,0 +1,18 @@
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+.env
+config.yaml
+*.egg-info/
+build/
+dist/
+workspace_data/
+# Bỏ qua các bộ cài đặt và file nén
+OllamaSetup.exe
+tools/*.exe
+*.zip
+
+# Bỏ qua môi trường và tool nặng
+tools/ffmpeg/
+tools/Python312/

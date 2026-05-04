@@ -1,0 +1,515 @@
+PROMPT THIET KE VA XAY DUNG HE THONG AUTO DICH VIDEO DA NGON NGU SANG TIENG VIET
+
+Muc dich cua file nay:
+- Day la prompt/spec tong the de AI co the xay dung hoan chinh mot he thong tu dong xu ly video da tai san, nhan dien ngon ngu noi, chuyen thanh van ban, dich sang tieng Viet, tao phu de va tuy chon long tieng.
+- Workspace hien tai dang trong, vi vay can thiet ke du an tu dau.
+- Uu tien he thong chay tot tren Windows, co the mo rong sang Linux sau.
+
+====================================================================
+1. MUC TIEU SAN PHAM
+====================================================================
+
+Hay xay dung mot he thong "Auto Translate Video to Vietnamese" voi cac kha nang sau:
+
+1. Nhan video dau vao tu thu muc local.
+2. Tu dong phat hien ngon ngu noi trong video.
+3. Tach audio tu video.
+4. Chuyen giong noi thanh van ban co moc thoi gian.
+5. Dich noi dung tu nhieu ngon ngu sang tieng Viet.
+6. Tao file phu de tieng Viet dang SRT va VTT.
+7. Tuy chon ghi phu de vao video hoac gan subtitle mem.
+8. Tuy chon tao voice-over tieng Viet va ghep lai vao video.
+9. Ho tro xu ly hang loat nhieu video.
+10. Co log, co kha nang tiep tuc job dang do, co cau hinh ro rang.
+
+Muc tieu uu tien:
+- Chay duoc o may ca nhan.
+- Uu tien chat luong va do on dinh hon toc do.
+- Kien truc mo de sau nay co the doi backend ASR, backend dich, backend TTS.
+- Co the dung offline-first, nhung cho phep tuy chon dung API neu nguoi dung muon chat luong dich cao hon.
+
+====================================================================
+2. DAU VAO, DAU RA, VA PHAM VI
+====================================================================
+
+Dau vao:
+- Cac file video da tai san: mp4, mkv, mov, avi, webm.
+- Co the co 1 video hoac nhieu video trong thu muc input.
+
+Dau ra toi thieu:
+- Ban transcript goc co timestamp.
+- Ban dich tieng Viet co timestamp.
+- File subtitle .srt
+- File subtitle .vtt
+- Video dau ra co subtitle mem hoac subtitle hardcode.
+
+Dau ra nang cao:
+- File audio voice-over tieng Viet.
+- Video co long tieng tieng Viet.
+- Bao cao JSON tong hop metadata, trang thai job, thoi gian xu ly, loi neu co.
+
+Ngoai pham vi giai doan 1:
+- Streaming realtime.
+- Dubbing theo khau hinh lip-sync nang cao.
+- Dashboard web phuc tap voi queue phan tan.
+
+====================================================================
+3. YEU CAU CHUC NANG CHI TIET
+====================================================================
+
+A. Quan ly input
+- Cho phep chi dinh:
+  - 1 file video cu the.
+  - Ca mot thu muc input.
+  - Che do quet thu muc va xu ly hang loat.
+- Bo qua file da xu ly thanh cong neu nguoi dung bat che do resume.
+- Dat ten thu muc output theo ten file video hoac theo ma job.
+
+B. Phan tich media
+- Doc metadata video bang ffprobe:
+  - do dai video
+  - codec
+  - sample rate
+  - so kenh audio
+  - subtitle co san hay khong
+- Neu video co nhieu track audio, cho phep chon track mac dinh hoac auto chon.
+
+C. Tach audio va tien xu ly
+- Dung ffmpeg de tach audio thanh wav mono 16k hoac 24k.
+- Chuan hoa am luong neu can.
+- Neu audio qua dai, cat thanh chunks nhung van giu duoc mapping timestamp chinh xac.
+- Can nhac voice activity detection de bo khoang lang dai.
+
+D. Speech-to-Text
+- Backend mac dinh de xuat:
+  - faster-whisper voi model medium hoac large-v3 neu may du tai nguyen.
+- He thong phai:
+  - auto detect language
+  - tao transcript theo segment co start/end
+  - co kha nang lua chon precision CPU/GPU
+  - luu transcript goc ra JSON va text
+- Neu gap video da ngon ngu hoac chat luong kem, can co option tinh chinh beam size, vad filter, chunk strategy.
+
+E. Dich sang tieng Viet
+- Dich tat ca segment transcript sang tieng Viet.
+- Giu nguyen timestamp.
+- Uu tien dich dung nghia, tu nhien, de doc, khong dich word-by-word.
+- Giu nguyen:
+  - ten rieng
+  - ten thuong hieu
+  - ma san pham
+  - URL, email, so dien thoai
+- Co co che glossary tu ngu tuy chinh.
+- Co backend abstraction:
+  - Local translation backend, vi du NLLB-200 hoac SeamlessM4T neu kha thi.
+  - API translation backend, vi du OpenAI hoac Google Translate, neu nguoi dung cung cap key.
+
+F. Hau xu ly subtitle
+- Gom hoac tach segment de subtitle de doc:
+  - moi dong khong qua dai
+  - moi subtitle khong qua 2 dong neu co the
+  - tranh nhap nhay qua nhanh
+- Sinh file SRT va VTT chuan.
+- Tuy chon tao ASS neu can style dep hon.
+
+G. Tao video dau ra
+- Mode 1: chi xuat file subtitle.
+- Mode 2: mux subtitle mem vao video.
+- Mode 3: burn subtitle truc tiep vao video.
+- Dung ffmpeg de ghep file subtitle vao output.
+
+H. Voice-over tieng Viet tuy chon
+- Neu bat che do long tieng:
+  - Tao TTS tieng Viet cho tung segment.
+  - Can chinh toc do de khop tuong doi voi khoang thoi gian goc.
+  - Mix voice moi voi nhac nen goc.
+  - Ha volume kenh goc khi co loi thoai.
+- Backend TTS de xuat:
+  - edge-tts cho giai doan dau
+  - co the nang cap XTTS, F5-TTS, hoac backend khac sau
+
+I. Giao dien su dung
+- Giai doan 1 bat buoc co CLI.
+- Co the them giao dien web nhe bang Gradio hoac Streamlit sau khi pipeline on dinh.
+- CLI can co cac lenh mau:
+  - xu ly 1 file
+  - xu ly ca thu muc
+  - bat/tat subtitle hardcode
+  - bat/tat voice-over
+  - chon backend dich
+  - chon model ASR
+
+J. Quan ly loi va log
+- Ghi log theo tung job.
+- Neu 1 video loi thi khong lam dung ca lo.
+- Luu file status JSON de resume.
+- Co thong diep loi ro rang: thieu ffmpeg, thieu model, loi API key, loi audio corrupt.
+
+====================================================================
+4. YEU CAU PHI CHUC NANG
+====================================================================
+
+- Code ro rang, tach module, de bao tri.
+- Co file config trung tam.
+- Co README huong dan cai dat va su dung.
+- Co file requirements.txt hoac pyproject.toml.
+- Co test cho cac phan logic quan trong.
+- Uu tien Python 3.11+.
+- Ho tro duong dan Windows.
+- Khong hardcode key.
+- Co file .env.example neu can API.
+
+====================================================================
+5. KIEN TRUC DE XUAT
+====================================================================
+
+Chon Python lam ngon ngu chinh.
+
+Kien truc module de xuat:
+
+1. app/
+   - __init__.py
+   - main.py
+   - cli.py
+   - config.py
+   - models.py
+
+2. app/core/
+   - pipeline.py
+   - job_manager.py
+   - logger.py
+   - utils.py
+
+3. app/media/
+   - probe.py
+   - audio_extract.py
+   - subtitle_mux.py
+   - video_render.py
+
+4. app/asr/
+   - base.py
+   - faster_whisper_backend.py
+   - segment_postprocess.py
+
+5. app/translate/
+   - base.py
+   - local_nllb_backend.py
+   - openai_backend.py
+   - glossary.py
+
+6. app/subtitles/
+   - srt_writer.py
+   - vtt_writer.py
+   - segment_formatter.py
+
+7. app/tts/
+   - base.py
+   - edge_tts_backend.py
+   - audio_align.py
+   - audio_mix.py
+
+8. app/storage/
+   - paths.py
+   - manifests.py
+
+9. tests/
+   - test_segment_formatter.py
+   - test_srt_writer.py
+   - test_config.py
+
+10. assets/
+   - sample_config.yaml
+
+11. docs/
+   - architecture.md
+   - roadmap.md
+
+====================================================================
+6. CONG NGHE VA THU VIEN DE XUAT
+====================================================================
+
+Bat buoc:
+- Python
+- ffmpeg + ffprobe
+- faster-whisper
+- pydantic
+- typer hoac argparse cho CLI
+- rich cho hien thi log/console dep hon
+- PyYAML hoac TOML config
+
+Nen co:
+- torch
+- ctranslate2
+- srt
+- webvtt-py hoac tu viet writer
+- python-dotenv
+
+Tuy chon:
+- edge-tts
+- openai
+- gradio hoac streamlit
+- pyannote.audio neu muon tach nguoi noi
+
+====================================================================
+7. LUONG XU LY CHUAN
+====================================================================
+
+Luong xu ly mong muon cho moi video:
+
+1. Nhan file dau vao.
+2. Tao job_id va thu muc output.
+3. Doc metadata bang ffprobe.
+4. Tach audio thanh wav chuan.
+5. Chay ASR de lay transcript goc + language detection.
+6. Hau xu ly segment transcript.
+7. Dich tung segment sang tieng Viet.
+8. Format subtitle de de doc.
+9. Xuat transcript.json, translated.json, output.srt, output.vtt.
+10. Neu bat subtitle mux:
+    - tao video co subtitle mem hoac hard subtitle.
+11. Neu bat voice-over:
+    - tao audio TTS
+    - can chinh duration
+    - mix vao video
+12. Ghi manifest.json ket qua job.
+
+====================================================================
+8. DINH DANG DU LIEU DE XUAT
+====================================================================
+
+Segment transcript JSON de xuat:
+
+{
+  "video_path": "input/sample.mp4",
+  "detected_language": "en",
+  "duration_sec": 123.45,
+  "segments": [
+    {
+      "id": 1,
+      "start": 0.52,
+      "end": 3.91,
+      "text": "Hello everyone and welcome back.",
+      "translated_text": "Xin chao moi nguoi, chao mung quay tro lai."
+    }
+  ]
+}
+
+Manifest job de xuat:
+
+{
+  "job_id": "sample_20260502_101500",
+  "status": "completed",
+  "input_video": "...",
+  "outputs": {
+    "transcript_json": "...",
+    "subtitle_srt": "...",
+    "subtitle_vtt": "...",
+    "video_softsub": "...",
+    "video_hardsub": "...",
+    "voiceover_audio": "..."
+  },
+  "errors": [],
+  "timings": {
+    "asr_sec": 0,
+    "translate_sec": 0,
+    "render_sec": 0
+  }
+}
+
+====================================================================
+9. YEU CAU CHAT LUONG DICH
+====================================================================
+
+Ban dich tieng Viet phai:
+- Tu nhien, de hieu, dung van canh.
+- Uu tien van noi thong dung neu video la giao tiep thong thuong.
+- Neu video ky thuat, giu thuat ngu chinh xac.
+- Khong duoc bo mat y chinh.
+- Khong tu y them thong tin khong co trong audio.
+- Neu gap tieng dem, tap am, ho, cuoi, co the bo hoac ghi ngan gon neu can thiet.
+
+Quy tac xu ly dac biet:
+- Giu nguyen ten rieng va ten thuong hieu neu khong can Viet hoa.
+- So, don vi, ngay thang can duoc Viet hoa tu nhien trong ngu canh tieng Viet.
+- Cau qua dai can tach nho de doc tren subtitle.
+
+====================================================================
+10. CAC CHE DO VAN HANH DE XUAT
+====================================================================
+
+Mode co ban:
+- transcript-only
+- translate-only
+- subtitle-only
+- full-pipeline
+
+Mode output:
+- softsub
+- hardsub
+- voiceover
+
+Mode backend:
+- local-only
+- hybrid
+- api-only
+
+====================================================================
+11. TIEU CHI HOAN THANH GIAI DOAN 1
+====================================================================
+
+He thong duoc xem la hoan thanh giai doan 1 khi:
+
+1. Chay duoc lenh CLI xu ly 1 video mau.
+2. Tu dong phat hien ngon ngu va transcript thanh cong.
+3. Dich sang tieng Viet.
+4. Tao duoc file SRT hop le.
+5. Tao duoc video dau ra co subtitle.
+6. Co README huong dan cai dat.
+7. Co config mau.
+8. Co test toi thieu cho formatter va writer.
+
+====================================================================
+12. CAC LENH CLI MONG MUON
+====================================================================
+
+Vi du giao dien dong lenh mong muon:
+
+python -m app.main process --input "input/video1.mp4" --output "output"
+
+python -m app.main batch --input-dir "input" --output-dir "output" --resume
+
+python -m app.main process --input "input/video1.mp4" --output "output" --render hardsub
+
+python -m app.main process --input "input/video1.mp4" --output "output" --voiceover --translator openai
+
+python -m app.main inspect --input "input/video1.mp4"
+
+====================================================================
+13. ROADMAP TRIỂN KHAI DE XUAT
+====================================================================
+
+Phase 1:
+- Scaffold project Python.
+- Tao config, CLI, logging, probe media, extract audio.
+
+Phase 2:
+- Tich hop faster-whisper.
+- Tao transcript JSON.
+- Tao subtitle SRT/VTT.
+
+Phase 3:
+- Tich hop backend dich sang tieng Viet.
+- Them glossary.
+- Cai thien segment formatting.
+
+Phase 4:
+- Render video softsub/hardsub.
+- Them batch processing va resume.
+
+Phase 5:
+- Them TTS voice-over.
+- Them giao dien web nhe neu can.
+
+====================================================================
+14. CAC RANG BUOC QUAN TRONG KHI AI XAY DUNG HE THONG
+====================================================================
+
+- Khong viet tat ca vao 1 file.
+- Phai chia module ro rang.
+- Phai co type hints o muc hop ly.
+- Phai ghi README ro rang.
+- Phai de duong dan, config, va backend co the thay doi.
+- Phai kiem tra su ton tai cua ffmpeg va dua ra loi de hieu neu chua cai.
+- Phai tao output co cau truc nhat quan.
+- Phai uu tien code chay duoc hon ly thuyet.
+
+====================================================================
+15. MASTER PROMPT DE DUNG CHO AI XAY DUNG DU AN
+====================================================================
+
+Sao chep nguyen khoi prompt duoi day khi muon AI bat dau code:
+
+"Ban la mot senior Python engineer. Hay xay dung tu dau trong workspace hien tai mot he thong hoan chinh de tu dong dich video da tai san tu nhieu ngon ngu sang tieng Viet.
+
+Yeu cau tong quat:
+- Du an dung Python 3.11+.
+- Chay tren Windows truoc.
+- Dau vao la file video local hoac thu muc video local.
+- Dau ra toi thieu gom transcript co timestamp, ban dich tieng Viet, file SRT, file VTT, va video co subtitle.
+- Phai co CLI ro rang.
+- Phai co logging, config, README, va test co ban.
+
+Pipeline bat buoc:
+1. Doc metadata video bang ffprobe.
+2. Tach audio bang ffmpeg.
+3. Speech-to-text bang faster-whisper, auto detect language.
+4. Dich transcript sang tieng Viet bang backend co the thay doi.
+5. Tao subtitle SRT/VTT.
+6. Tuy chon render video softsub hoac hardsub.
+7. Luu manifest JSON cho tung job.
+
+Rang buoc ky thuat:
+- Chia code thanh nhieu module ro rang.
+- Khong hardcode API key.
+- Tao file .env.example neu can.
+- Tao sample config.
+- Uu tien local-first, nhung cho phep backend API cho phan translation.
+- Cac segment subtitle phai de doc, khong qua dai.
+- Phai co kha nang xu ly hang loat va resume.
+- Neu workspace chua co gi, hay scaffold du an day du.
+
+Kien truc toi thieu can co:
+- app/main.py
+- app/cli.py
+- app/config.py
+- app/core/pipeline.py
+- app/media/probe.py
+- app/media/audio_extract.py
+- app/asr/faster_whisper_backend.py
+- app/translate/base.py
+- app/subtitles/srt_writer.py
+- app/subtitles/vtt_writer.py
+- tests/
+- README.md
+- requirements.txt hoac pyproject.toml
+
+Tinh nang nang cao nen de san hook:
+- Voice-over tieng Viet bang TTS.
+- Glossary tu ngu.
+- Chon nhieu backend dich.
+- Giao dien web nhe sau nay.
+
+Tieu chi thanh cong:
+- Chay duoc mot lenh CLI de xu ly 1 video.
+- Tao duoc SRT tieng Viet hop le.
+- Tao duoc video dau ra co subtitle.
+- README chi ro cach cai ffmpeg, cai dependency, va cach chay.
+
+Hay tu thuc hien theo thu tu hop ly:
+1. Tao skeleton du an.
+2. Cai dat module config + CLI + logging.
+3. Cai dat media probe + audio extraction.
+4. Cai dat ASR.
+5. Cai dat translation.
+6. Cai dat subtitle writer.
+7. Cai dat render output.
+8. Them test co ban.
+9. Cap nhat README.
+
+Moi buoc code xong phai dam bao cac import nhat quan, co xu ly loi co ban, va co the mo rong sau nay."
+
+====================================================================
+16. HUONG SU DUNG FILE NAY
+====================================================================
+
+- Neu muon minh bat dau code ngay, chi can bao:
+  "Hay dung file prompt_he_thong_dich_video_sang_tieng_viet.txt de scaffold va xay dung du an hoan chinh."
+
+- Neu muon rut gon pham vi, co the bao:
+  "Chi lam ban CLI transcript + dich + SRT truoc, chua can voice-over."
+
+- Neu muon uu tien chat luong cao va dung API:
+  "Dung OpenAI lam backend dich, faster-whisper lam ASR, xuat SRT va hardsub."
+
+Ket luan:
+File nay la ban spec/prompt goc de co the trien khai he thong dich video sang tieng Viet mot cach co cau truc, co lo trinh, va du de AI bat tay vao code tu workspace trong.

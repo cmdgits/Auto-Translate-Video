@@ -1,0 +1,54 @@
+app_name: Auto Translate Video
+ffmpeg_bin: ffmpeg
+ffprobe_bin: ffprobe
+directories:
+  jobs_dir: workspace_data/jobs
+  uploads_dir: workspace_data/uploads
+  temp_dir: workspace_data/tmp
+asr:
+  backend: faster-whisper
+  model_size: tiny
+  device: auto
+  compute_type: auto
+  beam_size: 1
+  cpu_threads: 4
+  num_workers: 1
+  vad_filter: true
+translation:
+  backend: echo
+  source_language: auto
+  target_language: vi
+  batch_size: 30
+  libretranslate_url:
+  libretranslate_api_key:
+  openai_base_url: https://api.openai.com/v1
+  openai_api_key:
+  openai_model: gpt-4o-mini
+  gemini_base_url: https://generativelanguage.googleapis.com/v1beta
+  gemini_api_key:
+  gemini_model: gemini-2.5-flash
+  llm_base_url:
+  llm_api_key:
+  llm_model:
+subtitles:
+  max_chars_per_line: 42
+  max_lines: 2
+  min_duration_sec: 1.1
+  max_duration_sec: 7.0
+render:
+  video_codec: libx264
+  preset: medium
+  crf: 20
+  audio_codec: aac
+  audio_bitrate: 192k
+  cover_original_subtitles: true
+  subtitle_cover_mode: blur
+  subtitle_cover_height_ratio: 0.18
+  subtitle_cover_opacity: 0.72
+tts:
+  backend: edge-tts
+  voice: vi-VN-HoaiMyNeural
+  rate_floor: -35
+  rate_ceil: 45
+  background_audio_gain: 0.24
+  voiceover_gain: 1.4
