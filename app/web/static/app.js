@@ -184,6 +184,9 @@ const state = {
 };
 
 function setDownloadLink(element, url) {
+  if (!element) {
+    return;
+  }
   if (!url) {
     element.href = "#";
     element.classList.add("disabled");
@@ -203,6 +206,9 @@ function setSubtitleDownloadAction(element, enabled, title) {
 }
 
 function setRenderActionLink(element, enabled, title) {
+  if (!element) {
+    return;
+  }
   element.href = "#";
   element.classList.toggle("disabled", !enabled);
   element.title = enabled ? title : "Cần có phụ đề trước khi xuất video.";
@@ -1259,10 +1265,12 @@ function applyJobState(job) {
   const jobPercent = Math.round((job.progress || 0) * 100);
   progressBadge.textContent = `${jobPercent}%`;
   updateRenderProgress(job);
-  translateSubtitleBtn.disabled = !job.downloads?.transcript_json;
-  translateSubtitleBtn.title = translateSubtitleBtn.disabled
-    ? "Cần xử lý/nhận dạng video xong trước khi dịch lại"
-    : "Dịch lại phụ đề sang tiếng Việt";
+  if (translateSubtitleBtn) {
+    translateSubtitleBtn.disabled = !job.downloads?.transcript_json;
+    translateSubtitleBtn.title = translateSubtitleBtn.disabled
+      ? "Cần xử lý/nhận dạng video xong trước khi dịch lại"
+      : "Dịch lại phụ đề sang tiếng Việt";
+  }
   renderArtifactLinks(job);
 
   const sourceMode = preferredPreviewSourceMode(state.previewMode);
@@ -1364,8 +1372,10 @@ function clearSelectedJob() {
   languageBadge.textContent = "ngôn ngữ gốc: --";
   progressBadge.textContent = "0%";
   updateRenderProgress(null);
-  translateSubtitleBtn.disabled = true;
-  translateSubtitleBtn.title = "Cần xử lý video xong trước khi dịch lại";
+  if (translateSubtitleBtn) {
+    translateSubtitleBtn.disabled = true;
+    translateSubtitleBtn.title = "Cần xử lý video xong trước khi dịch lại";
+  }
   renderArtifactLinks({ downloads: {} });
   setDirty(false);
   renderAll();
@@ -1972,18 +1982,20 @@ savePrompt.addEventListener("click", (event) => {
   }
 });
 
-saveTimelineBtn.addEventListener("click", async () => {
-  if (!state.jobId) {
-    return;
-  }
-  setStatus("Đang lưu phụ đề đã sửa...", "neutral");
-  try {
-    await saveTimeline();
-    setStatus("Đã lưu phụ đề.", "ok");
-  } catch (error) {
-    setStatus(userMessage(error.message), "error");
-  }
-});
+if (saveTimelineBtn) {
+  saveTimelineBtn.addEventListener("click", async () => {
+    if (!state.jobId) {
+      return;
+    }
+    setStatus("Đang lưu phụ đề đã sửa...", "neutral");
+    try {
+      await saveTimeline();
+      setStatus("Đã lưu phụ đề.", "ok");
+    } catch (error) {
+      setStatus(userMessage(error.message), "error");
+    }
+  });
+}
 
 if (sourceSrtLink) {
   sourceSrtLink.addEventListener("click", (event) => {
@@ -2005,17 +2017,19 @@ if (srtLink) {
   });
 }
 
-translateSubtitleBtn.addEventListener("click", async () => {
-  if (!state.jobId) {
-    return;
-  }
-  setStatus("Đang dịch lại phụ đề sang tiếng Việt...", "neutral");
-  try {
-    await runTranslate();
-  } catch (error) {
-    setStatus(userMessage(error.message), "error");
-  }
-});
+if (translateSubtitleBtn) {
+  translateSubtitleBtn.addEventListener("click", async () => {
+    if (!state.jobId) {
+      return;
+    }
+    setStatus("Đang dịch lại phụ đề sang tiếng Việt...", "neutral");
+    try {
+      await runTranslate();
+    } catch (error) {
+      setStatus(userMessage(error.message), "error");
+    }
+  });
+}
 
 if (burnSubtitleBtn) {
   burnSubtitleBtn.addEventListener("click", async () => {
