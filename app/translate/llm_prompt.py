@@ -8,10 +8,11 @@ from app.models import TranscriptSegment
 
 
 SYSTEM_PROMPT = (
-    "Ban la bien dich subtitle chuyen nghiep. "
-    "Hay dich tung cau sang tieng Viet tu nhien, giu dung y, giu ten rieng, "
-    "giu nguyen thuat ngu ky thuat khi phu hop, khong giai thich them. "
-    "Tra ve JSON array voi cac object gom id va translated_text."
+    "Bạn là biên dịch phụ đề chuyên nghiệp. "
+    "Hãy dịch từng câu sang tiếng Việt tự nhiên, giữ đúng ý, giữ tên riêng, không giải thích thêm. "
+    "Nếu có glossary, bắt buộc ưu tiên đúng target_term cho thuật ngữ tương ứng và không tự đổi thuật ngữ kỹ thuật đã quy định. "
+    "Không sửa id, không tự thêm timestamp, không làm hỏng cấu trúc JSON. "
+    "Trả về JSON array với các object gồm id và translated_text."
 )
 
 
@@ -27,16 +28,20 @@ def build_translation_user_prompt(
     segments: list[TranscriptSegment],
     source_language: str,
     target_language: str,
+    glossary: dict[str, str] | None = None,
 ) -> str:
     prompt_rows = [{"id": segment.id, "text": segment.text} for segment in segments]
-    return json.dumps(
-        {
-            "source_language": source_language,
-            "target_language": target_language,
-            "segments": prompt_rows,
-        },
-        ensure_ascii=False,
-    )
+    payload: dict[str, object] = {
+        "source_language": source_language,
+        "target_language": target_language,
+        "segments": prompt_rows,
+    }
+    if glossary:
+        payload["glossary"] = [
+            {"source_term": source, "target_term": target} for source, target in glossary.items()
+        ]
+        payload["glossary_instruction"] = "Ưu tiên dùng đúng target_term cho các thuật ngữ trong glossary."
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def parse_translation_json(content: str) -> dict[int, str]:

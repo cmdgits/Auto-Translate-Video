@@ -128,6 +128,20 @@ class TTSConfig(BaseModel):
     rate_ceil: int = 45
     background_audio_gain: float = 0.24
     voiceover_gain: float = 1.4
+    speaker_voice_map: dict[str, str] = Field(default_factory=dict)
+
+
+class WorkerConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    web_enabled: bool = True
+    backend: str = "thread"
+    broker_url: str = "redis://localhost:6379/0"
+    result_backend: str = "redis://localhost:6379/1"
+    max_attempts: int = 3
+    backoff_initial_sec: float = 5.0
+    backoff_factor: float = 2.0
+    backoff_max_sec: float = 60.0
 
 
 class AppConfig(BaseModel):
@@ -142,6 +156,7 @@ class AppConfig(BaseModel):
     subtitles: SubtitleConfig = Field(default_factory=SubtitleConfig)
     render: RenderConfig = Field(default_factory=RenderConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
+    worker: WorkerConfig = Field(default_factory=WorkerConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> "AppConfig":
@@ -160,6 +175,7 @@ class AppConfig(BaseModel):
                 "subtitles": data.get("subtitles", {}),
                 "render": data.get("render", {}),
                 "tts": data.get("tts", {}),
+                "worker": data.get("worker", {}),
             }
         )
         return config.model_copy(

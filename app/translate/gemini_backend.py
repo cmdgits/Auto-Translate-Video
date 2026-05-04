@@ -31,13 +31,21 @@ def normalize_gemini_model(model: str | None) -> str:
 
 
 class GeminiTranslatorBackend(TranslatorBackend):
-    def __init__(self, api_key: str | None, model: str | None, batch_size: int, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None,
+        model: str | None,
+        batch_size: int,
+        base_url: str | None = None,
+        glossary: dict[str, str] | None = None,
+    ) -> None:
         if not api_key:
             raise ConfigurationError("Chua cau hinh gemini_api_key hoac GEMINI_API_KEY.")
         self.api_key = api_key
         self.model = normalize_gemini_model(model)
         self.batch_size = batch_size
         self.base_url = (base_url or DEFAULT_GEMINI_BASE_URL).rstrip("/")
+        self.glossary = glossary or {}
 
     def translate_segments(
         self,
@@ -51,7 +59,7 @@ class GeminiTranslatorBackend(TranslatorBackend):
         with httpx.Client(timeout=120.0) as client:
             for start in range(0, len(segments), self.batch_size):
                 batch = segments[start : start + self.batch_size]
-                user_prompt = build_translation_user_prompt(batch, source_language, target_language)
+                user_prompt = build_translation_user_prompt(batch, source_language, target_language, self.glossary)
                 response = post_with_retry(
                     client,
                     f"{self.base_url}/models/{self.model}:generateContent",

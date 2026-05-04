@@ -7,14 +7,16 @@ import httpx
 from app.core.exceptions import ConfigurationError, ProcessError
 from app.models import TranscriptSegment
 from app.translate.base import TranslatorBackend
+from app.translate.glossary import apply_glossary_replacements
 
 
 class LibreTranslateBackend(TranslatorBackend):
-    def __init__(self, base_url: str | None, api_key: str | None = None) -> None:
+    def __init__(self, base_url: str | None, api_key: str | None = None, glossary: dict[str, str] | None = None) -> None:
         if not base_url:
             raise ConfigurationError("Chua cau hinh libretranslate_url.")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.glossary = glossary or {}
 
     def translate_segments(
         self,
@@ -42,7 +44,7 @@ class LibreTranslateBackend(TranslatorBackend):
                 translated = data.get("translatedText")
                 if not translated:
                     raise ProcessError("LibreTranslate khong tra ve translatedText hop le.")
-                outputs.append(translated.strip())
+                outputs.append(apply_glossary_replacements(translated.strip(), self.glossary))
                 if progress_callback:
                     progress_callback(len(outputs) / total_segments)
         return outputs

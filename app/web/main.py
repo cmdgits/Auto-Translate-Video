@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 import json
-import logging
 import sys
 from functools import lru_cache
 from pathlib import Path
 
 from fastapi import Body
-from fastapi import BackgroundTasks, File, Form, HTTPException, Request, UploadFile
+from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import AppConfig
+from app.core.celery_queue import CeleryJobQueue
 from app.core.exceptions import AppError
 from app.core.pipeline import VideoTranslationPipeline
+from app.core.worker import JobWorkerService
 from app.models import JobManifest, PipelineRunOptions, TranscriptUpdateRequest, sanitize_pipeline_options
+from app.media.waveform import write_waveform_json
 from app.subtitles.srt_writer import write_srt
-from app.web.job_queue import JobQueue
 
 if sys.version_info >= (3, 14):
     raise RuntimeError(
@@ -32,9 +33,6 @@ templates = Jinja2Templates(directory=str(WEB_ROOT / "templates"))
 app = FastAPI(title="Auto Translate Video")
 app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
 
-logger = logging.getLogger(__name__)
-
-
 @lru_cache
 def get_config() -> AppConfig:
     return AppConfig.load()
@@ -46,8 +44,10 @@ def get_pipeline() -> VideoTranslationPipeline:
 
 
 @lru_cache
-def get_job_queue() -> JobQueue:
-    return JobQueue(get_pipeline)
+def get_job_queue() -> JobWorkerService | CeleryJobQueue:
+    if get_config().worker.backend.lower() == "celery":
+        return CeleryJobQueue(get_pipeline())
+    return JobWorkerService(get_pipeline)
 
 
 def _load_transcript_payload(manifest: JobManifest) -> dict:
@@ -87,6 +87,8 @@ def _manifest_payload(manifest: JobManifest) -> dict:
     payload["preview_urls"] = {"source": f"/api/source/{manifest.job_id}"}
     if manifest.outputs.get("video_hardsub"):
         payload["preview_urls"]["hardsub"] = f"/api/download/{manifest.job_id}/video_hardsub"
+    if manifest.outputs.get("video_softsub"):
+        payload["preview_urls"]["softsub"] = f"/api/download/{manifest.job_id}/video_softsub"
     if manifest.outputs.get("video_voiceover"):
         payload["preview_urls"]["voiceover"] = f"/api/download/{manifest.job_id}/video_voiceover"
     payload["source_video_url"] = payload["preview_urls"]["source"]
@@ -152,6 +154,7 @@ def _options_from_form(
     gemini_model: str | None,
     libretranslate_url: str | None,
     libretranslate_api_key: str | None,
+    glossary_text: str | None,
     render_hardsub: bool,
     generate_voiceover: bool,
     voice_name: str | None,
@@ -189,6 +192,7 @@ def _options_from_form(
         gemini_model=gemini_model or None,
         libretranslate_url=libretranslate_url or None,
         libretranslate_api_key=libretranslate_api_key or None,
+        glossary_text=glossary_text or None,
         render_hardsub=render_hardsub,
         generate_voiceover=generate_voiceover,
         voice_name=voice_name or None,
@@ -225,42 +229,27 @@ async def _create_queued_job(file: UploadFile, options: PipelineRunOptions) -> J
         input_video=str(context.input_video),
         output_dir=str(context.root_dir),
         options=sanitize_pipeline_options(options),
+        task_type="process",
+        retry_max_attempts=max(1, int(get_config().worker.max_attempts)),
     )
     pipeline.jobs.write_manifest(context, initial_manifest)
-    get_job_queue().enqueue(context, options)
+    try:
+        get_job_queue().enqueue(context, options, task_type="process", update_manifest=False)
+    except Exception as exc:
+        failed_manifest = initial_manifest.model_copy(
+            update={
+                "status": "failed",
+                "stage": "worker_unavailable",
+                "progress": 1.0,
+                "errors": [
+                    "Không đưa được tác vụ vào worker. Nếu đang dùng Celery, hãy bật Redis và chạy run_worker.bat. "
+                    f"Chi tiết: {exc}"
+                ],
+            }
+        )
+        pipeline.jobs.update_manifest(failed_manifest)
+        raise HTTPException(status_code=503, detail=failed_manifest.errors[0]) from exc
     return initial_manifest
-
-
-def _run_background_job(context, options: PipelineRunOptions) -> None:
-    try:
-        get_pipeline().process_job(context, options)
-    except Exception:
-        logger.exception("Background job failed: %s", context.job_id)
-        return
-
-
-def _run_hardsub_background(job_id: str, options: PipelineRunOptions | None = None) -> None:
-    try:
-        get_pipeline().render_hardsub(job_id, options)
-    except Exception:
-        logger.exception("Hardsub render failed: %s", job_id)
-        return
-
-
-def _run_translate_background(job_id: str, options: PipelineRunOptions) -> None:
-    try:
-        get_pipeline().translate_transcript(job_id, options)
-    except Exception:
-        logger.exception("Translate failed: %s", job_id)
-        return
-
-
-def _run_voiceover_background(job_id: str, options: PipelineRunOptions) -> None:
-    try:
-        get_pipeline().render_voiceover(job_id, options)
-    except Exception:
-        logger.exception("Voiceover render failed: %s", job_id)
-        return
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -285,9 +274,12 @@ async def healthcheck() -> dict[str, str]:
 
 @app.on_event("startup")
 async def start_job_queue() -> None:
+    if not get_config().worker.web_enabled:
+        return
     queue = get_job_queue()
     queue.start()
-    queue.mark_stale_running_jobs_failed()
+    if get_config().worker.backend.lower() != "celery":
+        queue.resume_pending()
 
 
 @app.post("/api/jobs")
@@ -306,6 +298,7 @@ async def create_job(
     gemini_model: str | None = Form(None),
     libretranslate_url: str | None = Form(None),
     libretranslate_api_key: str | None = Form(None),
+    glossary_text: str | None = Form(None),
     render_hardsub: bool = Form(False),
     generate_voiceover: bool = Form(False),
     voice_name: str | None = Form(None),
@@ -332,6 +325,7 @@ async def create_job(
         gemini_model,
         libretranslate_url,
         libretranslate_api_key,
+        glossary_text,
         render_hardsub,
         generate_voiceover,
         voice_name,
@@ -345,7 +339,7 @@ async def create_job(
         subtitle_cover_height_ratio,
     )
     manifest = await _create_queued_job(file, options)
-    return JSONResponse({"job_id": manifest.job_id, "status_url": f"/api/jobs/{manifest.job_id}"})
+    return JSONResponse(_manifest_payload(manifest))
 
 
 @app.post("/api/jobs/batch")
@@ -364,6 +358,7 @@ async def create_batch_jobs(
     gemini_model: str | None = Form(None),
     libretranslate_url: str | None = Form(None),
     libretranslate_api_key: str | None = Form(None),
+    glossary_text: str | None = Form(None),
     render_hardsub: bool = Form(False),
     generate_voiceover: bool = Form(False),
     voice_name: str | None = Form(None),
@@ -392,6 +387,7 @@ async def create_batch_jobs(
         gemini_model,
         libretranslate_url,
         libretranslate_api_key,
+        glossary_text,
         render_hardsub,
         generate_voiceover,
         voice_name,
@@ -405,13 +401,7 @@ async def create_batch_jobs(
         subtitle_cover_height_ratio,
     )
     manifests = [await _create_queued_job(file, options) for file in files]
-    return JSONResponse(
-        {
-            "jobs": [
-                {"job_id": manifest.job_id, "status_url": f"/api/jobs/{manifest.job_id}"} for manifest in manifests
-            ]
-        }
-    )
+    return JSONResponse({"jobs": [_manifest_payload(manifest) for manifest in manifests]})
 
 
 @app.get("/api/jobs")
@@ -454,7 +444,7 @@ async def cancel_job(job_id: str) -> JSONResponse:
     manifest = _get_manifest_or_404(job_id)
     if manifest.status not in {"queued", "running"}:
         return JSONResponse(_manifest_payload(manifest))
-    cancelled_manifest = get_pipeline().cancel_job(job_id)
+    cancelled_manifest = get_job_queue().cancel(job_id)
     return JSONResponse(_manifest_payload(cancelled_manifest))
 
 
@@ -470,16 +460,20 @@ async def update_segments(job_id: str, payload: TranscriptUpdateRequest) -> JSON
 @app.post("/api/jobs/{job_id}/render/hardsub")
 async def render_hardsub(
     job_id: str,
-    background_tasks: BackgroundTasks,
     options: PipelineRunOptions | None = Body(default=None),
 ) -> JSONResponse:
-    manifest = _mark_job_running(job_id, "rendering_hardsub", 0.0)
-    background_tasks.add_task(_run_hardsub_background, job_id, options)
+    manifest = get_job_queue().enqueue_existing(job_id, "render_hardsub", options or PipelineRunOptions())
+    return JSONResponse(_manifest_payload(manifest))
+
+
+@app.post("/api/jobs/{job_id}/render/softsub")
+async def render_softsub(job_id: str, options: PipelineRunOptions | None = Body(default=None)) -> JSONResponse:
+    manifest = get_job_queue().enqueue_existing(job_id, "render_softsub", options or PipelineRunOptions())
     return JSONResponse(_manifest_payload(manifest))
 
 
 @app.post("/api/jobs/{job_id}/translate")
-async def translate_job(job_id: str, background_tasks: BackgroundTasks, options: PipelineRunOptions) -> JSONResponse:
+async def translate_job(job_id: str, options: PipelineRunOptions) -> JSONResponse:
     manifest = _get_manifest_or_404(job_id)
     if manifest.status in {"queued", "running"}:
         raise HTTPException(
@@ -491,16 +485,14 @@ async def translate_job(job_id: str, background_tasks: BackgroundTasks, options:
             status_code=409,
             detail="Chưa có bản nhận dạng giọng nói cho job này. Hãy chạy xử lý video xong trước, rồi mới bấm Dịch lại sang tiếng Việt.",
         )
-    running_manifest = _mark_job_running(job_id, "translating", 0.0)
-    background_tasks.add_task(_run_translate_background, job_id, options)
-    return JSONResponse(_manifest_payload(running_manifest))
+    queued_manifest = get_job_queue().enqueue_existing(job_id, "translate", options)
+    return JSONResponse(_manifest_payload(queued_manifest))
 
 
 @app.post("/api/jobs/{job_id}/render/voiceover")
-async def render_voiceover(job_id: str, background_tasks: BackgroundTasks, options: PipelineRunOptions) -> JSONResponse:
-    manifest = _mark_job_running(job_id, "rendering_voiceover", 0.0)
+async def render_voiceover(job_id: str, options: PipelineRunOptions) -> JSONResponse:
     render_options = options.model_copy(update={"generate_voiceover": True})
-    background_tasks.add_task(_run_voiceover_background, job_id, render_options)
+    manifest = get_job_queue().enqueue_existing(job_id, "render_voiceover", render_options)
     return JSONResponse(_manifest_payload(manifest))
 
 
@@ -513,9 +505,21 @@ async def get_source_video(job_id: str) -> FileResponse:
     return FileResponse(source_path)
 
 
+@app.get("/api/jobs/{job_id}/waveform")
+async def get_waveform(job_id: str) -> JSONResponse:
+    manifest = _get_manifest_or_404(job_id)
+    context = get_pipeline().jobs.get_context(job_id, input_video=Path(manifest.input_video))
+    if not context.waveform_json_path.exists():
+        if context.extracted_audio_path.exists():
+            write_waveform_json(context.extracted_audio_path, context.waveform_json_path)
+        else:
+            return JSONResponse({"version": 1, "pending": True, "peaks": [], "points": 0})
+    return JSONResponse(json.loads(context.waveform_json_path.read_text(encoding="utf-8")))
+
+
 @app.get("/api/download/{job_id}/{artifact}")
 async def download_artifact(job_id: str, artifact: str) -> FileResponse:
-    manifest = _get_manifest_or_404(job_id)
+    manifest = _manifest_with_existing_outputs(_get_manifest_or_404(job_id))
     if artifact == "source_subtitle_srt":
         source_path = _ensure_source_subtitle(manifest)
         if source_path and source_path.exists():

@@ -4,30 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-37" />
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-40" />
   </head>
   <body>
-    <div class="capcut-shell">
-      <aside class="app-rail">
-        <div class="rail-logo">⌁</div>
-        <nav class="rail-tabs" aria-label="Công cụ chính">
-          <button class="rail-tab active" type="button"><span>☁</span><small>Phương tiện</small></button>
-          <button class="rail-tab" type="button"><span>▣</span><small>Mẫu</small></button>
-          <button class="rail-tab" type="button"><span>▥</span><small>Kho video</small></button>
-          <button class="rail-tab" type="button"><span>▧</span><small>Hình ảnh</small></button>
-          <button class="rail-tab" type="button"><span>♫</span><small>Âm thanh</small></button>
-        </nav>
-        <div class="rail-bottom">
-          <button class="rail-icon" type="button">✎</button>
-          <button class="rail-icon" type="button">⌨</button>
-        </div>
-      </aside>
-
+    <div class="capcut-shell" id="appShell">
       <aside class="media-panel">
         <header class="user-strip">
           <span class="avatar">U</span>
           <strong>Auto Translate</strong>
-          <button type="button">☰</button>
+          <button id="mediaPanelToggle" type="button" aria-label="Thu gọn hoặc mở thanh bên" aria-expanded="true" title="Thu gọn thanh bên">☰</button>
         </header>
 
         <form id="jobForm" class="upload-form">
@@ -172,6 +157,10 @@
               <span>LibreTranslate key</span>
               <input name="libretranslate_api_key" type="password" autocomplete="off" />
             </label>
+            <label class="field two-col">
+              <span>Glossary thuật ngữ</span>
+              <textarea name="glossary_text" rows="5" placeholder="AI = trí tuệ nhân tạo&#10;render = xuất video&#10;timeline = dòng thời gian"></textarea>
+            </label>
             <button class="secondary-action" id="saveApiSettingsBtn" type="button">Lưu cài đặt API</button>
             <span class="muted" id="apiSettingsStatus">Chỉ cần mở khi muốn đổi khóa hoặc model.</span>
           </form>
@@ -265,6 +254,8 @@
             </div>
             <div class="toolbar-group export-format-group" aria-label="Xuất video">
               <a class="artifact-link disabled" href="#" id="hardsubLink">MP4 phụ đề</a>
+              <a class="artifact-link disabled" href="#" id="softsubLink">MKV softsub</a>
+              <a class="artifact-link disabled" href="#" id="softsubCommandLink">Lệnh FFmpeg</a>
               <a class="artifact-link disabled" href="#" id="voiceoverLink">MP4 thuyết minh</a>
             </div>
           </div>
@@ -287,6 +278,7 @@
           </div>
           <div class="timeline-track" id="timelineTrack">
             <div class="timeline-ruler" id="timelineRuler"></div>
+            <canvas class="timeline-waveform" id="timelineWaveform" height="54"></canvas>
             <div class="timeline-lane" id="timelineLane"></div>
           </div>
         </section>
@@ -304,6 +296,20 @@
           <label class="field source-field"><span>Ngôn ngữ gốc</span><textarea id="segmentSource" rows="4"></textarea></label>
           <label class="field hidden"><span>Bản dịch</span><textarea id="segmentTranslated" rows="4"></textarea></label>
           <label class="field"><span>Phụ đề hiển thị</span><textarea id="segmentSubtitle" rows="4"></textarea></label>
+          <div class="time-grid speaker-grid">
+            <label class="field"><span>Speaker</span><input id="segmentSpeaker" type="text" placeholder="VD: SPEAKER_00, SPEAKER_01, Host" /></label>
+            <label class="field"><span>Giọng đoạn này</span>
+              <select id="segmentVoiceName">
+                <option value="">Theo giọng mặc định</option>
+                <option value="vi-VN-HoaiMyNeural">Nữ Việt Nam - Hoài My</option>
+                <option value="vi-VN-NamMinhNeural">Nam Việt Nam - Nam Minh</option>
+                <option value="en-US-JennyNeural">Nữ Mỹ - Jenny</option>
+                <option value="en-US-GuyNeural">Nam Mỹ - Guy</option>
+                <option value="ja-JP-NanamiNeural">Nữ Nhật - Nanami</option>
+                <option value="ko-KR-SunHiNeural">Nữ Hàn - SunHi</option>
+              </select>
+            </label>
+          </div>
           <div class="button-grid narrow">
             <button class="ghost-button" id="nudgeBackBtn" type="button">Lùi -0.10 giây</button>
             <button class="ghost-button" id="nudgeForwardBtn" type="button">Tiến +0.10 giây</button>
@@ -336,6 +342,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-37" defer></script>
+    <script src="/static/app.js?v=capcut-layout-20260504-40" defer></script>
   </body>
 </html>

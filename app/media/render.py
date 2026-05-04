@@ -128,3 +128,65 @@ def render_video_with_replaced_audio(
     ]
     run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
     return output_video
+
+
+def mux_subtitle_tracks_into_video(
+    input_video: Path,
+    subtitle_tracks: list[tuple[Path, str, str]],
+    output_video: Path,
+    ffmpeg_bin: str,
+    render_config: RenderConfig,
+    duration_sec: float | None = None,
+    progress_callback: Callable[[float], None] | None = None,
+) -> Path:
+    if not subtitle_tracks:
+        raise ValueError("Cần ít nhất một track phụ đề để mux softsub.")
+    output_video.parent.mkdir(parents=True, exist_ok=True)
+    subtitle_codec = "srt" if output_video.suffix.lower() == ".mkv" else "mov_text"
+    command = [ensure_binary(ffmpeg_bin), "-y", "-i", str(input_video)]
+    for subtitle_path, _, _ in subtitle_tracks:
+        command.extend(["-i", str(subtitle_path)])
+    command.extend(["-map", "0:v:0", "-map", "0:a?"])
+    for index in range(len(subtitle_tracks)):
+        command.extend(["-map", f"{index + 1}:0"])
+    command.extend([
+        "-c:v",
+        "copy",
+        "-c:a",
+        "copy",
+        "-c:s",
+        subtitle_codec,
+    ])
+    for index, (_, language, title) in enumerate(subtitle_tracks):
+        command.extend(["-metadata:s:s:" + str(index), f"language={language or 'und'}"])
+        if title:
+            command.extend(["-metadata:s:s:" + str(index), f"title={title}"])
+        command.extend(["-disposition:s:" + str(index), "default" if index == 1 else "0"])
+    if output_video.suffix.lower() != ".mkv":
+        command.extend(["-movflags", "+faststart"])
+    command.append(str(output_video))
+    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
+    return output_video
+
+
+def build_mux_subtitle_tracks_command_string(
+    input_video: Path,
+    subtitle_tracks: list[tuple[Path, str, str]],
+    output_video: Path,
+    ffmpeg_bin: str,
+) -> str:
+    subtitle_codec = "srt" if output_video.suffix.lower() == ".mkv" else "mov_text"
+    command = [ensure_binary(ffmpeg_bin), "-y", "-i", str(input_video)]
+    for subtitle_path, _, _ in subtitle_tracks:
+        command.extend(["-i", str(subtitle_path)])
+    command.extend(["-map", "0:v:0", "-map", "0:a?"])
+    for index in range(len(subtitle_tracks)):
+        command.extend(["-map", f"{index + 1}:0"])
+    command.extend(["-c:v", "copy", "-c:a", "copy", "-c:s", subtitle_codec])
+    for index, (_, language, title) in enumerate(subtitle_tracks):
+        command.extend(["-metadata:s:s:" + str(index), f"language={language or 'und'}"])
+        if title:
+            command.extend(["-metadata:s:s:" + str(index), f"title={title}"])
+        command.extend(["-disposition:s:" + str(index), "default" if index == 1 else "0"])
+    command.append(str(output_video))
+    return " ".join(f'"{item}"' if " " in item else item for item in command)

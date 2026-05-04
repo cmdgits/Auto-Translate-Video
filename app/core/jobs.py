@@ -23,12 +23,15 @@ class JobContext:
     tts_dir: Path
     manifest_path: Path
     extracted_audio_path: Path
+    waveform_json_path: Path
     transcript_json_path: Path
     original_srt_path: Path
     srt_path: Path
     vtt_path: Path
     ass_path: Path
     hardsub_video_path: Path
+    softsub_video_path: Path
+    softsub_command_path: Path
     voiceover_audio_path: Path
     voiceover_video_path: Path
     voiceover_filter_path: Path
@@ -77,12 +80,15 @@ class JobManager:
             tts_dir=tts_dir,
             manifest_path=root_dir / "manifest.json",
             extracted_audio_path=audio_dir / "source_16k.wav",
+            waveform_json_path=data_dir / "waveform.json",
             transcript_json_path=data_dir / "transcript.vi.json",
             original_srt_path=subtitles_dir / "subtitles.original.srt",
             srt_path=subtitles_dir / "subtitles.vi.srt",
             vtt_path=subtitles_dir / "subtitles.vi.vtt",
             ass_path=subtitles_dir / "subtitles.vi.ass",
             hardsub_video_path=renders_dir / "video.hardsub.mp4",
+            softsub_video_path=renders_dir / "video.softsub.mkv",
+            softsub_command_path=renders_dir / "video.softsub.ffmpeg.txt",
             voiceover_audio_path=audio_dir / "voiceover.vi.m4a",
             voiceover_video_path=renders_dir / "video.voiceover.vi.mp4",
             voiceover_filter_path=tts_dir / "voiceover_mix.ffscript",
@@ -106,12 +112,15 @@ class JobManager:
             tts_dir=job_root / "tts",
             manifest_path=job_root / "manifest.json",
             extracted_audio_path=job_root / "audio" / "source_16k.wav",
+            waveform_json_path=job_root / "data" / "waveform.json",
             transcript_json_path=job_root / "data" / "transcript.vi.json",
             original_srt_path=job_root / "subtitles" / "subtitles.original.srt",
             srt_path=job_root / "subtitles" / "subtitles.vi.srt",
             vtt_path=job_root / "subtitles" / "subtitles.vi.vtt",
             ass_path=job_root / "subtitles" / "subtitles.vi.ass",
             hardsub_video_path=job_root / "renders" / "video.hardsub.mp4",
+            softsub_video_path=job_root / "renders" / "video.softsub.mkv",
+            softsub_command_path=job_root / "renders" / "video.softsub.ffmpeg.txt",
             voiceover_audio_path=job_root / "audio" / "voiceover.vi.m4a",
             voiceover_video_path=job_root / "renders" / "video.voiceover.vi.mp4",
             voiceover_filter_path=job_root / "tts" / "voiceover_mix.ffscript",

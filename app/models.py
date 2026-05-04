@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 JobStatus = Literal["queued", "running", "completed", "failed", "completed_with_errors", "cancelled"]
+JobTaskType = Literal["process", "translate", "render_hardsub", "render_softsub", "render_voiceover"]
 
 
 class VideoMetadata(BaseModel):
@@ -25,6 +26,8 @@ class TranscriptSegment(BaseModel):
     text: str
     translated_text: str | None = None
     subtitle_text: str | None = None
+    speaker: str | None = None
+    voice_name: str | None = None
 
 
 class TranscriptDocument(BaseModel):
@@ -52,6 +55,8 @@ class PipelineRunOptions(BaseModel):
     gemini_model: str | None = None
     libretranslate_url: str | None = None
     libretranslate_api_key: str | None = None
+    glossary_text: str | None = None
+    glossary_json_path: str | None = None
     render_hardsub: bool = False
     generate_voiceover: bool = False
     voice_name: str | None = None
@@ -105,3 +110,8 @@ class JobManifest(BaseModel):
     timings: dict[str, float] = Field(default_factory=dict)
     metadata: VideoMetadata | None = None
     options: dict[str, object] = Field(default_factory=dict)
+    task_type: JobTaskType | None = None
+    retry_attempt: int = 0
+    retry_max_attempts: int = 1
+    retry_next_at: float | None = None
+    retry_last_error: str | None = None

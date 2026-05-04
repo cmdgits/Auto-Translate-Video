@@ -12,7 +12,13 @@ from app.core.exceptions import ConfigurationError, JobCancelledError, ProcessEr
 from app.core.jobs import JobContext, JobManager
 from app.media.audio_extract import extract_audio_to_wav
 from app.media.probe import probe_video
-from app.media.render import burn_subtitles_into_video, render_video_with_replaced_audio
+from app.media.render import (
+    build_mux_subtitle_tracks_command_string,
+    burn_subtitles_into_video,
+    mux_subtitle_tracks_into_video,
+    render_video_with_replaced_audio,
+)
+from app.media.waveform import write_waveform_json
 from app.models import (
     JobManifest,
     PipelineRunOptions,
@@ -123,6 +129,7 @@ class VideoTranslationPipeline:
             )
             self._emit_running(context, manifest, progress_hook)
             extract_audio_to_wav(context.input_video, context.extracted_audio_path, self.config.ffmpeg_bin)
+            write_waveform_json(context.extracted_audio_path, context.waveform_json_path)
             self._raise_if_cancelled(context)
 
             manifest = manifest.model_copy(update={"stage": "transcribing", "progress": 0.48})
@@ -467,6 +474,71 @@ class VideoTranslationPipeline:
             self._emit(context, failed_manifest, None)
             raise
 
+    def render_softsub(self, job_id: str, options: PipelineRunOptions | None = None) -> JobManifest:
+        context, manifest = self._require_job(job_id)
+        running_manifest = manifest.model_copy(
+            update={
+                "status": "running",
+                "stage": "rendering_softsub",
+                "progress": 0.0,
+            }
+        )
+        self._emit(context, running_manifest, None)
+        started_at = time.perf_counter()
+
+        try:
+            self._raise_if_cancelled(context)
+            transcript = self._read_transcript(context)
+            self._write_transcript_assets(transcript, context, preserve_existing=True)
+            current_manifest = running_manifest
+
+            def on_softsub_progress(progress: float) -> None:
+                nonlocal current_manifest
+                self._raise_if_cancelled(context)
+                current_manifest = current_manifest.model_copy(update={"progress": min(progress, 0.999)})
+                self._emit_running(context, current_manifest, None)
+
+            self._render_softsub_output(context, on_softsub_progress)
+            self._raise_if_cancelled(context)
+            timings = {**manifest.timings, "render_softsub_sec": round(time.perf_counter() - started_at, 3)}
+            updated_manifest = running_manifest.model_copy(
+                update={
+                    "status": "completed",
+                    "stage": "completed",
+                    "progress": 1.0,
+                    "outputs": self._collect_existing_outputs(context),
+                    "timings": timings,
+                    "errors": [],
+                }
+            )
+            self._raise_if_cancelled(context)
+            self._emit(context, updated_manifest, None)
+            return updated_manifest
+        except JobCancelledError as exc:
+            cancelled_manifest = running_manifest.model_copy(
+                update={
+                    "status": "cancelled",
+                    "stage": "cancelled",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                }
+            )
+            self._emit(context, cancelled_manifest, None)
+            return cancelled_manifest
+        except Exception as exc:
+            failed_manifest = running_manifest.model_copy(
+                update={
+                    "status": "completed_with_errors",
+                    "stage": "render_softsub_failed",
+                    "progress": 1.0,
+                    "errors": [str(exc)],
+                    "outputs": self._collect_existing_outputs(context),
+                }
+            )
+            self._emit(context, failed_manifest, None)
+            raise
+
     def render_voiceover(self, job_id: str, options: PipelineRunOptions | None = None) -> JobManifest:
         run_options = options or PipelineRunOptions(generate_voiceover=True)
         context, manifest = self._require_job(job_id)
@@ -572,6 +644,37 @@ class VideoTranslationPipeline:
             context.hardsub_video_path,
             self.config.ffmpeg_bin,
             self._render_config_for_options(options),
+            duration_sec=duration_sec,
+            progress_callback=progress_callback,
+        )
+
+    def _render_softsub_output(
+        self,
+        context: JobContext,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> Path:
+        if not context.original_srt_path.exists() or not context.srt_path.exists():
+            raise ProcessError("Chưa có đủ phụ đề gốc và phụ đề tiếng Việt để mux softsub.")
+        duration_sec = self._duration_for_context(context)
+        subtitle_tracks = [
+            (context.original_srt_path, "eng", "Phụ đề gốc"),
+            (context.srt_path, "vie", "Phụ đề tiếng Việt"),
+        ]
+        context.softsub_command_path.write_text(
+            build_mux_subtitle_tracks_command_string(
+                context.input_video,
+                subtitle_tracks,
+                context.softsub_video_path,
+                self.config.ffmpeg_bin,
+            ),
+            encoding="utf-8",
+        )
+        return mux_subtitle_tracks_into_video(
+            context.input_video,
+            subtitle_tracks,
+            context.softsub_video_path,
+            self.config.ffmpeg_bin,
+            self.config.render,
             duration_sec=duration_sec,
             progress_callback=progress_callback,
         )
@@ -729,6 +832,8 @@ class VideoTranslationPipeline:
             text=source_text,
             translated_text=translated_text,
             subtitle_text=subtitle_text or None,
+            speaker=(segment.speaker or "").strip() or None,
+            voice_name=(segment.voice_name or "").strip() or None,
         )
 
     def _duration_for_imported_segments(self, segments: list[TranscriptSegment], manifest: JobManifest) -> float:
@@ -739,12 +844,15 @@ class VideoTranslationPipeline:
     def _collect_existing_outputs(self, context: JobContext) -> dict[str, str]:
         candidates = {
             "audio_wav": context.extracted_audio_path,
+            "waveform_json": context.waveform_json_path,
             "transcript_json": context.transcript_json_path,
             "source_subtitle_srt": context.original_srt_path,
             "subtitle_srt": context.srt_path,
             "subtitle_vtt": context.vtt_path,
             "subtitle_ass": context.ass_path,
             "video_hardsub": context.hardsub_video_path,
+            "video_softsub": context.softsub_video_path,
+            "video_softsub_ffmpeg": context.softsub_command_path,
             "voiceover_audio": context.voiceover_audio_path,
             "video_voiceover": context.voiceover_video_path,
         }
@@ -753,6 +861,8 @@ class VideoTranslationPipeline:
     def _invalidate_render_outputs(self, context: JobContext) -> None:
         for path in (
             context.hardsub_video_path,
+            context.softsub_video_path,
+            context.softsub_command_path,
             context.voiceover_audio_path,
             context.voiceover_video_path,
             context.voiceover_filter_path,

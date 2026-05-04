@@ -13,13 +13,21 @@ from app.translate.retry import post_with_retry
 
 
 class LLMHTTPTranslatorBackend(TranslatorBackend):
-    def __init__(self, base_url: str | None, api_key: str | None, model: str | None, batch_size: int) -> None:
+    def __init__(
+        self,
+        base_url: str | None,
+        api_key: str | None,
+        model: str | None,
+        batch_size: int,
+        glossary: dict[str, str] | None = None,
+    ) -> None:
         if not base_url or not model:
             raise ConfigurationError("Chua cau hinh llm_base_url hoac llm_model.")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.batch_size = batch_size
+        self.glossary = glossary or {}
 
     def translate_segments(
         self,
@@ -33,7 +41,7 @@ class LLMHTTPTranslatorBackend(TranslatorBackend):
         with httpx.Client(timeout=120.0) as client:
             for start in range(0, len(segments), self.batch_size):
                 batch = segments[start : start + self.batch_size]
-                user_prompt = build_translation_user_prompt(batch, source_language, target_language)
+                user_prompt = build_translation_user_prompt(batch, source_language, target_language, self.glossary)
                 response = post_with_retry(
                     client,
                     f"{self.base_url}/chat/completions",

@@ -52,12 +52,13 @@ button {
 
 .capcut-shell {
   display: grid;
-  grid-template-columns: 76px 280px minmax(620px, 1fr) 320px;
+  grid-template-columns: 280px minmax(620px, 1fr) 320px;
   height: 100vh;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
   background: var(--bg);
+  transition: grid-template-columns 0.22s ease;
 }
 
 .capcut-shell > * {
@@ -72,73 +73,6 @@ button {
   font: inherit;
 }
 
-.app-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 18px 8px;
-  background: #050609;
-  color: #fff;
-}
-
-.app-rail button {
-  appearance: none;
-}
-
-.rail-logo {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  font-size: 30px;
-  font-weight: 900;
-}
-
-.rail-tabs {
-  display: grid;
-  gap: 8px;
-  width: 100%;
-}
-
-.rail-tab,
-.rail-icon {
-  display: grid;
-  place-items: center;
-  gap: 4px;
-  width: 60px;
-  min-height: 58px;
-  padding: 8px 4px;
-  border-radius: 14px;
-  background: transparent;
-  color: #d8dbe1;
-  cursor: pointer;
-}
-
-.rail-tab span {
-  font-size: 18px;
-}
-
-.rail-tab small {
-  font-size: 11px;
-  line-height: 1.15;
-  text-align: center;
-}
-
-.rail-tab.active,
-.rail-tab:hover,
-.rail-icon:hover {
-  background: #1c2532;
-  color: #fff;
-}
-
-.rail-bottom {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-}
-
 .media-panel {
   position: relative;
   display: flex;
@@ -149,6 +83,39 @@ button {
   background: var(--panel-dark);
   color: #f8fafc;
   border-right: 1px solid #242630;
+}
+
+.capcut-shell.media-collapsed {
+  grid-template-columns: 58px minmax(620px, 1fr) 320px;
+}
+
+.capcut-shell.media-collapsed .media-panel {
+  overflow: hidden;
+}
+
+.capcut-shell.media-collapsed .media-panel > :not(.user-strip) {
+  display: none;
+}
+
+.capcut-shell.media-collapsed .user-strip {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  height: 100vh;
+  padding: 10px 8px;
+  align-content: start;
+  gap: 12px;
+}
+
+.capcut-shell.media-collapsed .avatar,
+.capcut-shell.media-collapsed .user-strip strong {
+  display: none;
+}
+
+.capcut-shell.media-collapsed #mediaPanelToggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: #191b22;
 }
 
 .user-strip {
@@ -178,6 +145,10 @@ button {
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+#mediaPanelToggle:hover {
+  color: #00c2ff;
 }
 
 .upload-form,
@@ -633,11 +604,17 @@ button {
 
 .render-progress {
   display: grid;
-  grid-template-columns: minmax(150px, auto) minmax(180px, 360px);
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(190px, auto) minmax(240px, 1fr);
   align-items: center;
-  justify-content: flex-end;
+  justify-content: stretch;
   gap: 10px;
   min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(39, 174, 232, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
 .render-progress-label {
@@ -649,7 +626,7 @@ button {
 }
 
 .render-progress-track {
-  height: 10px;
+  height: 12px;
   overflow: hidden;
   border-radius: 999px;
   background: #e7ecf3;
@@ -663,6 +640,10 @@ button {
   border-radius: inherit;
   background: linear-gradient(90deg, #6c5ce7, #00c2ff);
   transition: width 0.25s ease;
+}
+
+.render-progress:not(.hidden) .render-progress-track span {
+  min-width: 8px;
 }
 
 .export-button {
@@ -1090,10 +1071,12 @@ body.dragging-subtitle * {
   grid-template-rows: 48px 1fr;
   min-height: 0;
   background: #fff;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .timeline-actions {
-  padding: 6px 22px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--line);
   overflow: auto hidden;
 }
@@ -1128,14 +1111,25 @@ body.dragging-subtitle * {
 .timeline-track {
   position: relative;
   min-width: 0;
+  margin-top: 6px;
   overflow: auto hidden;
   background: #f8fafc;
+  border: 1px solid #e4eaf0;
+  border-radius: 12px 12px 0 0;
 }
 
 .timeline-ruler {
   position: relative;
   height: 28px;
   min-width: 100%;
+  border-bottom: 1px solid #e4eaf0;
+}
+
+.timeline-waveform {
+  display: block;
+  width: 100%;
+  height: 54px;
+  background: linear-gradient(180deg, #f8fafc, #eef3f8);
   border-bottom: 1px solid #e4eaf0;
 }
 
@@ -1158,13 +1152,13 @@ body.dragging-subtitle * {
 .timeline-lane {
   position: relative;
   min-width: 100%;
-  height: 150px;
-  background: linear-gradient(#f8fafc 0 58px, #e8edf2 58px 92px, #f8fafc 92px);
+  height: 116px;
+  background: linear-gradient(#f8fafc 0 42px, #e8edf2 42px 74px, #f8fafc 74px);
 }
 
 .timeline-block {
   position: absolute;
-  top: 20px;
+  top: 14px;
   height: 66px;
   min-width: 52px;
   padding: 8px;
@@ -1264,6 +1258,10 @@ body.dragging * {
   flex: 1;
 }
 
+.speaker-grid {
+  gap: 8px;
+}
+
 .compact-grid .field {
   min-width: 0;
 }
@@ -1327,6 +1325,17 @@ body.dragging * {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.script-copy small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .script-empty {
@@ -1393,7 +1402,11 @@ body.dragging * {
 
 @media (max-width: 1280px) {
   .capcut-shell {
-    grid-template-columns: 64px 260px minmax(520px, 1fr);
+    grid-template-columns: 260px minmax(520px, 1fr);
+  }
+
+  .capcut-shell.media-collapsed {
+    grid-template-columns: 54px minmax(520px, 1fr);
   }
 
   .inspector-panel {
@@ -1416,7 +1429,6 @@ body.dragging * {
     min-height: 100vh;
   }
 
-  .app-rail,
   .media-panel,
   .inspector-panel {
     display: none;

@@ -1,4 +1,6 @@
 const form = document.getElementById("jobForm");
+const appShell = document.getElementById("appShell");
+const mediaPanelToggle = document.getElementById("mediaPanelToggle");
 const apiSettingsForm = document.getElementById("apiSettingsForm");
 const fileInput = document.getElementById("videoFile");
 const subtitleFileInput = document.getElementById("subtitleFile");
@@ -37,6 +39,7 @@ const renderProgressFill = document.getElementById("renderProgressFill");
 const timelineTrack = document.getElementById("timelineTrack");
 const timelineLane = document.getElementById("timelineLane");
 const timelineRuler = document.getElementById("timelineRuler");
+const timelineWaveform = document.getElementById("timelineWaveform");
 const timelineZoomRange = document.getElementById("timelineZoomRange");
 const timelineZoomValue = document.getElementById("timelineZoomValue");
 const timelineMeta = document.getElementById("timelineMeta");
@@ -47,6 +50,8 @@ const srtLink = document.getElementById("srtLink");
 const vttLink = document.getElementById("vttLink");
 const jsonLink = document.getElementById("jsonLink");
 const hardsubLink = document.getElementById("hardsubLink");
+const softsubLink = document.getElementById("softsubLink");
+const softsubCommandLink = document.getElementById("softsubCommandLink");
 const voiceoverLink = document.getElementById("voiceoverLink");
 const previewSourceBtn = document.getElementById("previewSourceBtn");
 const previewHardsubBtn = document.getElementById("previewHardsubBtn");
@@ -62,6 +67,8 @@ const segmentEndInput = document.getElementById("segmentEnd");
 const segmentSourceInput = document.getElementById("segmentSource");
 const segmentTranslatedInput = document.getElementById("segmentTranslated");
 const segmentSubtitleInput = document.getElementById("segmentSubtitle");
+const segmentSpeakerInput = document.getElementById("segmentSpeaker");
+const segmentVoiceNameSelect = document.getElementById("segmentVoiceName");
 const nudgeBackBtn = document.getElementById("nudgeBackBtn");
 const nudgeForwardBtn = document.getElementById("nudgeForwardBtn");
 const useTranslatedBtn = document.getElementById("useTranslatedBtn");
@@ -95,6 +102,7 @@ const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
+const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
 const API_SETTING_FIELDS = [
   "openai_api_key",
   "openai_model",
@@ -107,6 +115,7 @@ const API_SETTING_FIELDS = [
   "llm_model",
   "libretranslate_url",
   "libretranslate_api_key",
+  "glossary_text",
 ];
 
 const STATUS_LABELS = {
@@ -134,15 +143,18 @@ const STAGE_LABELS = {
   translating: "Dịch phụ đề",
   writing_subtitles: "Ghi file phụ đề",
   rendering_hardsub: "Xuất video có phụ đề",
+  rendering_softsub: "Xuất video softsub",
   rendering_voiceover: "Xuất video thuyết minh",
   subtitle_saved: "Đã lưu phụ đề",
   subtitle_translated: "Đã dịch lại phụ đề",
+  retry_waiting: "Đang chờ thử lại",
   translation_failed: "Dịch phụ đề thất bại",
   completed: "Hoàn tất",
   completed_with_errors: "Hoàn tất có lỗi",
   failed: "Thất bại",
   cancelled: "Đã dừng",
   render_hardsub_failed: "Xuất phụ đề thất bại",
+  render_softsub_failed: "Xuất softsub thất bại",
   render_voiceover_failed: "Xuất thuyết minh thất bại",
 };
 
@@ -151,12 +163,29 @@ const EXPORT_ARTIFACTS = {
     label: "video phụ đề",
     suffix: "phu-de",
   },
+  video_softsub: {
+    label: "video softsub",
+    suffix: "softsub",
+    extension: "mkv",
+    mime: "video/x-matroska",
+  },
   video_voiceover: {
     label: "video thuyết minh",
     suffix: "thuyet-minh",
   },
 };
-const ACTIVE_PROGRESS_STAGES = new Set(["translating", "rendering_hardsub", "rendering_voiceover"]);
+const ACTIVE_PROGRESS_STAGES = new Set([
+  "queued",
+  "probing",
+  "extracting_audio",
+  "transcribing",
+  "translating",
+  "writing_subtitles",
+  "rendering_hardsub",
+  "rendering_softsub",
+  "rendering_voiceover",
+  "retry_waiting",
+]);
 
 const state = {
   jobId: null,
@@ -180,6 +209,9 @@ const state = {
   previewMode: "source",
   previewSourceMode: "source",
   drag: null,
+  waveform: null,
+  waveformJobId: null,
+  waveformLoading: false,
   canvasResize: null,
   subtitleDrag: null,
   liveSegmentId: null,
@@ -303,6 +335,33 @@ function setStatus(text, tone = "neutral") {
   statusPill.title = text;
 }
 
+function setMediaPanelCollapsed(collapsed, persist = true) {
+  if (!appShell || !mediaPanelToggle) {
+    return;
+  }
+  appShell.classList.toggle("media-collapsed", collapsed);
+  mediaPanelToggle.setAttribute("aria-expanded", String(!collapsed));
+  mediaPanelToggle.title = collapsed ? "Mở thanh bên" : "Thu gọn thanh bên";
+  if (persist) {
+    try {
+      window.localStorage.setItem(MEDIA_PANEL_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+    } catch (error) {
+    }
+  }
+  window.requestAnimationFrame(() => {
+    applyVideoZoom();
+    renderTimeline();
+  });
+}
+
+function loadMediaPanelState() {
+  try {
+    setMediaPanelCollapsed(window.localStorage.getItem(MEDIA_PANEL_COLLAPSED_STORAGE_KEY) === "1", false);
+  } catch (error) {
+    setMediaPanelCollapsed(false, false);
+  }
+}
+
 function updateStopJobButton(job = state.job) {
   if (!stopJobBtn) {
     return;
@@ -323,7 +382,7 @@ function filenameStem(value) {
 
 function defaultExportFilename(artifact) {
   const config = exportArtifactConfig(artifact);
-  return `${filenameStem(state.job?.input_video || state.jobId)}.${config.suffix}.mp4`;
+  return `${filenameStem(state.job?.input_video || state.jobId)}.${config.suffix}.${config.extension || "mp4"}`;
 }
 
 function exportArtifactConfig(artifact) {
@@ -339,12 +398,14 @@ async function pickExportDestination(artifact) {
     return { mode: "browser-download", artifact };
   }
   const config = exportArtifactConfig(artifact);
+  const extension = config.extension || "mp4";
+  const mime = config.mime || "video/mp4";
   const handle = await window.showSaveFilePicker({
     suggestedName: defaultExportFilename(artifact),
     types: [
       {
-        description: `MP4 ${config.label}`,
-        accept: { "video/mp4": [".mp4"] },
+        description: `${extension.toUpperCase()} ${config.label}`,
+        accept: { [mime]: [`.${extension}`] },
       },
     ],
   });
@@ -370,12 +431,26 @@ async function saveBlobToDestination(blob, destination, fallbackFilename) {
 }
 
 async function saveRenderedArtifact(job, destination) {
-  if (!destination?.artifact || !job?.downloads?.[destination.artifact]) {
+  if (!destination?.artifact) {
     return false;
   }
   const config = exportArtifactConfig(destination.artifact);
+  let currentJob = job;
+  let downloadUrl = currentJob?.downloads?.[destination.artifact] || null;
+  if (!downloadUrl && currentJob?.job_id) {
+    currentJob = await fetchJobSnapshot(currentJob.job_id);
+    downloadUrl = currentJob?.downloads?.[destination.artifact] || null;
+  }
+  if (!downloadUrl) {
+    throw new Error(`Chưa có file ${config.label}. Hãy bấm xuất ${config.label} và chờ render xong.`);
+  }
   setStatus(`Đang lưu ${config.label}...`, "neutral");
-  const response = await fetch(job.downloads[destination.artifact]);
+  let response = await fetch(downloadUrl);
+  if (!response.ok && response.status === 404 && currentJob?.job_id) {
+    currentJob = await fetchJobSnapshot(currentJob.job_id);
+    downloadUrl = currentJob?.downloads?.[destination.artifact] || downloadUrl;
+    response = await fetch(downloadUrl);
+  }
   if (!response.ok) {
     throw new Error(`Không tải được ${config.label} sau khi xuất.`);
   }
@@ -387,10 +462,12 @@ async function saveRenderedArtifact(job, destination) {
 }
 
 function updateRenderProgress(job = null) {
-  const isActiveProgress = Boolean(job && job.status === "running" && ACTIVE_PROGRESS_STAGES.has(job.stage));
   if (!renderProgress || !renderProgressFill || !renderProgressLabel) {
     return;
   }
+  const isActiveProgress = Boolean(
+    job && ["queued", "running"].includes(job.status) && ACTIVE_PROGRESS_STAGES.has(job.stage || "queued"),
+  );
   renderProgress.classList.toggle("hidden", !isActiveProgress);
   if (!isActiveProgress) {
     renderProgressFill.style.width = "0%";
@@ -400,8 +477,20 @@ function updateRenderProgress(job = null) {
   }
   const percent = Math.max(0, Math.min(100, Math.round((job.progress || 0) * 100)));
   renderProgressFill.style.width = `${percent}%`;
-  renderProgressLabel.textContent = `${stageLabel(job.stage)} ${percent}%`;
+  renderProgressLabel.textContent = `${stageLabel(job.stage || "queued")} ${percent}%`;
   renderProgress.setAttribute("aria-valuenow", String(percent));
+}
+
+async function fetchJobSnapshot(jobId) {
+  const response = await fetch(`/api/jobs/${jobId}`);
+  if (!response.ok) {
+    return null;
+  }
+  const job = await response.json().catch(() => null);
+  if (job?.job_id) {
+    applyJobState(job);
+  }
+  return job;
 }
 
 function showToast(text, tone = "neutral") {
@@ -440,6 +529,21 @@ function clampNumber(value, min, max, fallback) {
     return fallback;
   }
   return Math.max(min, Math.min(max, parsed));
+}
+
+function snapTimelineTime(value) {
+  const duration = Number(state.job?.duration_sec || 0);
+  let snapped = Number(value) || 0;
+  const playhead = Number(videoPreview.currentTime || 0);
+  const snapThreshold = Math.max(0.04, 10 / Math.max(state.timelinePixelsPerSecond || DEFAULT_TIMELINE_PIXELS_PER_SECOND, 1));
+  if (Number.isFinite(playhead) && Math.abs(snapped - playhead) <= snapThreshold) {
+    snapped = playhead;
+  }
+  snapped = Math.round(snapped / 0.05) * 0.05;
+  if (duration > 0) {
+    snapped = Math.max(0, Math.min(snapped, duration));
+  }
+  return Number(snapped.toFixed(3));
 }
 
 function showSubtitleOverlayInCurrentMode() {
@@ -730,6 +834,8 @@ function normalizeImportedSegments(segments, duration = 0) {
       text: String(segment.subtitle_text || segment.translated_text || segment.text || "").trim(),
       translated_text: String(segment.translated_text || segment.subtitle_text || segment.text || "").trim(),
       subtitle_text: String(segment.subtitle_text || segment.translated_text || segment.text || "").trim(),
+      speaker: String(segment.speaker || "").trim(),
+      voice_name: String(segment.voice_name || "").trim(),
     }))
     .filter((segment) => Number.isFinite(segment.start) && Number.isFinite(segment.end) && segment.end > segment.start)
     .sort((first, second) => first.start - second.start || first.end - second.end)
@@ -747,6 +853,8 @@ function normalizeImportedSegments(segments, duration = 0) {
         text: segment.text || segment.subtitle_text || segment.translated_text || "",
         translated_text: segment.translated_text || segment.subtitle_text || segment.text || "",
         subtitle_text: segment.subtitle_text || segment.translated_text || segment.text || "",
+        speaker: segment.speaker || "",
+        voice_name: segment.voice_name || "",
       });
     });
   return normalized;
@@ -866,6 +974,8 @@ function cloneSegments(segments) {
     ...segment,
     translated_text: segment.translated_text || segment.text || "",
     subtitle_text: segmentSubtitleText(segment),
+    speaker: segment.speaker || "",
+    voice_name: segment.voice_name || "",
   }));
 }
 
@@ -1084,6 +1194,8 @@ function renderArtifactLinks(job) {
   setDownloadLink(vttLink, job.downloads?.subtitle_vtt);
   setDownloadLink(jsonLink, job.downloads?.transcript_json);
   setRenderActionLink(hardsubLink, canRenderVideo, "Xuất lại MP4 phụ đề từ nội dung đang sửa");
+  setRenderActionLink(softsubLink, canRenderVideo, "Xuất MKV softsub gồm phụ đề gốc và phụ đề tiếng Việt");
+  setDownloadLink(softsubCommandLink, job.downloads?.video_softsub_ffmpeg);
   setRenderActionLink(voiceoverLink, canRenderVideo, "Xuất lại MP4 thuyết minh từ phụ đề đang sửa");
 }
 
@@ -1103,11 +1215,12 @@ function renderJobList(jobs) {
     }
     const filename = String(job.input_video || job.job_id).split(/[\\/]/).pop();
     const canStopJob = ["queued", "running"].includes(job.status);
+    const retryText = job.retry_attempt > 1 ? ` | lần ${job.retry_attempt}/${job.retry_max_attempts || job.retry_attempt}` : "";
     item.innerHTML = `
       <button class="job-select" type="button" data-job-action="select">
         <div>
           <strong>${escapeHtml(filename)}</strong>
-          <span>${escapeHtml(stageLabel(job.stage || job.status))} | ${Math.round((job.progress || 0) * 100)}%</span>
+          <span>${escapeHtml(stageLabel(job.stage || job.status))} | ${Math.round((job.progress || 0) * 100)}%${escapeHtml(retryText)}</span>
         </div>
         <small class="job-status">${escapeHtml(statusLabel(job.status))}</small>
       </button>
@@ -1116,6 +1229,69 @@ function renderJobList(jobs) {
     `;
     jobList.appendChild(item);
   });
+}
+
+function drawWaveform() {
+  if (!timelineWaveform) {
+    return;
+  }
+  const width = Math.max(1, Math.round(state.laneWidth || timelineTrack.clientWidth || 1));
+  const height = Math.max(1, timelineWaveform.height || 54);
+  if (timelineWaveform.width !== width) {
+    timelineWaveform.width = width;
+  }
+  timelineWaveform.style.width = `${width}px`;
+  const context = timelineWaveform.getContext("2d");
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#eef3f8";
+  context.fillRect(0, 0, width, height);
+  const peaks = state.waveform?.peaks || [];
+  if (!peaks.length) {
+    context.fillStyle = "#94a3b8";
+    context.font = "12px system-ui";
+    context.fillText(state.waveformLoading ? "Đang tải waveform..." : "Chưa có waveform", 12, 31);
+    return;
+  }
+  const centerY = height / 2;
+  context.strokeStyle = "rgba(15, 118, 110, 0.22)";
+  context.beginPath();
+  context.moveTo(0, centerY);
+  context.lineTo(width, centerY);
+  context.stroke();
+  context.strokeStyle = "#0f766e";
+  context.lineWidth = 1;
+  const step = width / peaks.length;
+  peaks.forEach((peak, index) => {
+    const x = Math.round(index * step);
+    const amplitude = Math.max(1, Number(peak || 0) * (height * 0.46));
+    context.beginPath();
+    context.moveTo(x, centerY - amplitude);
+    context.lineTo(x, centerY + amplitude);
+    context.stroke();
+  });
+}
+
+async function loadWaveform(jobId) {
+  if (!jobId || state.waveformLoading) {
+    return;
+  }
+  state.waveformLoading = true;
+  state.waveform = null;
+  state.waveformJobId = jobId;
+  drawWaveform();
+  try {
+    const response = await fetch(`/api/jobs/${jobId}/waveform`);
+    state.waveform = response.ok ? await response.json() : null;
+    if (state.waveform?.pending) {
+      state.waveformJobId = null;
+    }
+  } catch (error) {
+    state.waveform = null;
+    state.waveformJobId = null;
+  } finally {
+    state.waveformLoading = false;
+    drawWaveform();
+  }
 }
 
 function renderTimeline() {
@@ -1128,6 +1304,10 @@ function renderTimeline() {
     timelineMeta.textContent = "Chưa có bản nhận diện.";
     timelineLane.style.width = "100%";
     timelineRuler.style.width = "100%";
+    if (timelineWaveform) {
+      timelineWaveform.style.width = "100%";
+      drawWaveform();
+    }
     return;
   }
 
@@ -1135,6 +1315,10 @@ function renderTimeline() {
   state.laneWidth = Math.max(timelineTrack.clientWidth || 0, roundedDuration * state.timelinePixelsPerSecond);
   timelineLane.style.width = `${state.laneWidth}px`;
   timelineRuler.style.width = `${state.laneWidth}px`;
+  if (!state.waveform?.peaks?.length && !state.waveformLoading) {
+    loadWaveform(state.job?.job_id);
+  }
+  drawWaveform();
   timelineMeta.textContent = `${segments.length} đoạn | ${formatSeconds(duration)} | ${state.timelinePixelsPerSecond} px/s`;
 
   const minMarkerGap = 92;
@@ -1201,6 +1385,7 @@ function renderScriptList() {
       <div class="script-time">${formatSeconds(segment.start)} - ${formatSeconds(segment.end)}</div>
       <div class="script-copy">
         <strong>${escapeHtml(segmentSubtitleText(segment))}</strong>
+        ${segment.speaker ? `<small>${escapeHtml(segment.speaker)}${segment.voice_name ? ` · ${escapeHtml(segment.voice_name)}` : ""}</small>` : ""}
       </div>
     `;
     scriptList.appendChild(item);
@@ -1210,7 +1395,7 @@ function renderScriptList() {
 function renderInspector() {
   const segment = getSelectedSegment();
   const disabled = !segment;
-  [segmentStartInput, segmentEndInput, segmentSourceInput, segmentTranslatedInput, segmentSubtitleInput].forEach((input) => {
+  [segmentStartInput, segmentEndInput, segmentSourceInput, segmentTranslatedInput, segmentSubtitleInput, segmentSpeakerInput, segmentVoiceNameSelect].forEach((input) => {
     input.disabled = disabled;
   });
   [nudgeBackBtn, nudgeForwardBtn, useTranslatedBtn, splitSegmentBtn, mergePreviousBtn, mergeNextBtn].forEach((button) => {
@@ -1225,6 +1410,8 @@ function renderInspector() {
     segmentSourceInput.value = "";
     segmentTranslatedInput.value = "";
     segmentSubtitleInput.value = "";
+    segmentSpeakerInput.value = "";
+    segmentVoiceNameSelect.value = "";
     return;
   }
 
@@ -1240,6 +1427,8 @@ function renderInspector() {
   segmentSourceInput.value = segment.text || "";
   segmentTranslatedInput.value = segment.translated_text || "";
   segmentSubtitleInput.value = segmentSubtitleText(segment);
+  segmentSpeakerInput.value = segment.speaker || "";
+  segmentVoiceNameSelect.value = segment.voice_name || "";
 }
 
 function renderAll() {
@@ -1345,6 +1534,12 @@ function applyJobState(job) {
   if (!state.segments.length) {
     state.selectedSegmentId = null;
   }
+  if (state.waveformJobId !== job.job_id) {
+    loadWaveform(job.job_id);
+  } else if (job.outputs?.waveform_json && !state.waveform?.peaks?.length && !state.waveformLoading) {
+    state.waveformJobId = null;
+    loadWaveform(job.job_id);
+  }
 
   languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"}`;
   const jobPercent = Math.round((job.progress || 0) * 100);
@@ -1376,7 +1571,8 @@ function applyJobState(job) {
   if (restoredDraft) {
     setStatus("Đã khôi phục nháp phụ đề tự lưu.", "warn");
   } else {
-    setStatus(`${stageLabel(job.stage)} | ${jobPercent}%`, job.status === "completed_with_errors" ? "warn" : "neutral");
+    const retryStatus = job.retry_attempt > 1 ? ` | thử lại ${job.retry_attempt}/${job.retry_max_attempts || job.retry_attempt}` : "";
+    setStatus(`${stageLabel(job.stage)} | ${jobPercent}%${retryStatus}`, job.status === "completed_with_errors" ? "warn" : "neutral");
   }
   renderAll();
 
@@ -1396,7 +1592,7 @@ function applyJobState(job) {
 
   if (job.status === "completed_with_errors") {
     const message = job.errors?.[0] || "Xuất video hoàn tất nhưng có cảnh báo";
-    if (state.pendingExportSave?.jobId === job.job_id && job.downloads?.[state.pendingExportSave.destination.artifact]) {
+    if (state.pendingExportSave?.jobId === job.job_id) {
       const pendingExport = state.pendingExportSave;
       state.pendingExportSave = null;
       saveRenderedArtifact(job, pendingExport.destination)
@@ -1540,6 +1736,8 @@ function sanitizeSegmentsForSave() {
     text: String(segment.text || "").trim(),
     translated_text: String(segment.translated_text || segment.text || "").trim(),
     subtitle_text: segmentSubtitleText(segment),
+    speaker: String(segment.speaker || "").trim() || null,
+    voice_name: String(segment.voice_name || "").trim() || null,
   }));
 }
 
@@ -1685,6 +1883,18 @@ async function renderVoiceoverFromCurrentSubtitles() {
     `/api/jobs/${state.jobId}/render/voiceover`,
     "video_voiceover",
     voiceoverRenderPayload(),
+  );
+}
+
+async function renderSoftsubFromCurrentSubtitles() {
+  if (!state.jobId || softsubLink.classList.contains("disabled")) {
+    return;
+  }
+  setStatus("Đang xuất MKV softsub gồm nhiều track phụ đề...", "neutral");
+  await runRenderWithDestination(
+    `/api/jobs/${state.jobId}/render/softsub`,
+    "video_softsub",
+    subtitleStylePayload(),
   );
 }
 
@@ -1886,6 +2096,8 @@ function mergeSelectedSegment(direction) {
       segmentSubtitleText(secondSegment),
       "\n",
     ),
+    speaker: firstSegment.speaker || secondSegment.speaker || "",
+    voice_name: firstSegment.voice_name || secondSegment.voice_name || "",
   };
 
   state.segments = segments
@@ -1948,6 +2160,12 @@ videoFitBtn.addEventListener("click", () => {
 if (canvasControlsToggle && canvasControls) {
   canvasControlsToggle.addEventListener("click", () => {
     setCanvasControlsOpen(canvasControls.classList.contains("collapsed"));
+  });
+}
+
+if (mediaPanelToggle && appShell) {
+  mediaPanelToggle.addEventListener("click", () => {
+    setMediaPanelCollapsed(!appShell.classList.contains("media-collapsed"));
   });
 }
 
@@ -2027,6 +2245,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   setStatus(files.length === 1 ? "Đang tải lên và đưa tác vụ vào hàng đợi..." : `Đang tải lên và đưa ${files.length} tác vụ vào hàng đợi...`, "neutral");
+  updateRenderProgress({ status: "queued", stage: "queued", progress: 0 });
   const payload = new FormData(form);
   appendApiSettings(payload);
   appendSubtitleStyle(payload);
@@ -2049,12 +2268,14 @@ form.addEventListener("submit", async (event) => {
   const data = await response.json();
   const queuedJobs = data.jobs || [data];
   clearSubtitleDraft();
-  state.jobId = queuedJobs[0].job_id;
+  if (!queuedJobs[0]) {
+    updateRenderProgress(null);
+    setStatus("Không nhận được tác vụ mới từ máy chủ.", "error");
+    return;
+  }
+  applyJobState(queuedJobs[0]);
   state.previewMode = "source";
   setDirty(false);
-  progressBadge.textContent = "0%";
-  updateRenderProgress(null);
-  languageBadge.textContent = "ngôn ngữ gốc: --";
   startPolling();
   await pollJobs();
   await pollJob(state.jobId);
@@ -2229,6 +2450,17 @@ hardsubLink.addEventListener("click", async (event) => {
   }
 });
 
+if (softsubLink) {
+  softsubLink.addEventListener("click", async (event) => {
+    event.preventDefault();
+    try {
+      await renderSoftsubFromCurrentSubtitles();
+    } catch (error) {
+      setStatus(userMessage(error.message), "error");
+    }
+  });
+}
+
 voiceoverLink.addEventListener("click", async (event) => {
   event.preventDefault();
   try {
@@ -2260,6 +2492,14 @@ segmentTranslatedInput.addEventListener("input", () => {
 
 segmentSubtitleInput.addEventListener("input", () => {
   updateSelectedTextField("subtitle_text", segmentSubtitleInput.value);
+});
+
+segmentSpeakerInput.addEventListener("input", () => {
+  updateSelectedTextField("speaker", segmentSpeakerInput.value);
+});
+
+segmentVoiceNameSelect.addEventListener("change", () => {
+  updateSelectedTextField("voice_name", segmentVoiceNameSelect.value);
 });
 
 nudgeBackBtn.addEventListener("click", () => {
@@ -2369,21 +2609,23 @@ document.addEventListener("mousemove", (event) => {
     const segmentDuration = state.drag.initialEnd - state.drag.initialStart;
     let nextStart = state.drag.initialStart + deltaSeconds;
     nextStart = Math.max(0, Math.min(nextStart, duration - segmentDuration));
+    nextStart = Math.max(0, Math.min(snapTimelineTime(nextStart), duration - segmentDuration));
     segment.start = nextStart;
     segment.end = nextStart + segmentDuration;
   }
 
   if (state.drag.mode === "resize-left") {
-    segment.start = Math.max(0, Math.min(state.drag.initialStart + deltaSeconds, segment.end - MIN_SEGMENT_DURATION));
+    segment.start = Math.max(0, Math.min(snapTimelineTime(state.drag.initialStart + deltaSeconds), segment.end - MIN_SEGMENT_DURATION));
   }
 
   if (state.drag.mode === "resize-right") {
-    segment.end = Math.min(duration, Math.max(state.drag.initialEnd + deltaSeconds, segment.start + MIN_SEGMENT_DURATION));
+    segment.end = Math.min(duration, Math.max(snapTimelineTime(state.drag.initialEnd + deltaSeconds), segment.start + MIN_SEGMENT_DURATION));
   }
 
   segment.start = Number(segment.start.toFixed(3));
   segment.end = Number(segment.end.toFixed(3));
   setDirty(true);
+  timelineMeta.textContent = `Đang chỉnh đoạn ${segment.id}: ${formatSeconds(segment.start)} - ${formatSeconds(segment.end)}`;
   renderTimeline();
   renderInspector();
 });
@@ -2491,6 +2733,7 @@ window.addEventListener("beforeunload", (event) => {
 setPreviewButtons();
 renderInspector();
 clearSelectedJob();
+loadMediaPanelState();
 applyVideoZoom();
 loadSubtitleStyle();
 applyTimelineZoom(DEFAULT_TIMELINE_PIXELS_PER_SECOND, false);

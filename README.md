@@ -10,13 +10,18 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Tự động tách âm thanh, nhận diện lời thoại bằng `faster-whisper` và tạo phụ đề theo thời gian.
 - Dịch phụ đề sang tiếng Việt bằng nhiều backend như `echo`, `mymemory`, `libretranslate`, `gpt`, `gemini` hoặc `llm-http`.
 - Chỉnh sửa phụ đề trực tiếp trên timeline; bấm vào đoạn timeline sẽ chuyển video tới đúng đoạn đó.
+- Hiển thị waveform âm thanh trên timeline để canh lời thoại trực quan hơn.
 - Phóng to, thu nhỏ video và timeline để canh vị trí, thời gian hiển thị phụ đề dễ hơn.
+- Kéo cả đoạn phụ đề hoặc kéo mép trái/phải để chỉnh thời gian, có snap nhẹ theo playhead.
 - Tùy chỉnh kích thước, vị trí và vùng hiển thị phụ đề trên video.
 - Làm mờ hoặc che vùng chữ gốc bằng hiệu ứng blur/mask trước khi phủ phụ đề mới.
 - Tự lưu nháp phụ đề trên trình duyệt để tránh mất nội dung khi đang sửa.
 - Có nút dừng tác vụ khi dịch, tạo phụ đề hoặc render quá lâu.
+- Queue worker xử lý tác vụ nền, có thể chạy trong web hoặc chạy như service riêng bằng CLI.
+- Tự retry/backoff khi tác vụ nền lỗi tạm thời, ví dụ lỗi API dịch, TTS hoặc render.
 - Hiển thị thanh tiến trình phần trăm cho các tác vụ dịch, tạo thuyết minh và xuất video.
 - Lưu phụ đề gốc, lưu phụ đề đã dịch, xuất video phụ đề `.mp4` và xuất video thuyết minh `.mp4`.
+- Gán speaker và chọn giọng đọc riêng cho từng đoạn phụ đề khi xuất thuyết minh.
 - Giao diện toolbar tự xuống dòng gọn hơn khi dùng trên màn hình nhỏ.
 
 ## Yêu Cầu Hệ Thống
@@ -119,6 +124,8 @@ http://127.0.0.1:8001
 - Sửa trực tiếp nội dung phụ đề trong vùng chỉnh sửa.
 - Điều chỉnh thời gian bắt đầu/kết thúc nếu phụ đề lệch so với video.
 - Dùng thanh zoom timeline để kéo giãn hoặc thu gọn khoảng thời gian hiển thị.
+- Dựa vào waveform để kéo mép đoạn phụ đề khớp với nhịp âm thanh.
+- Có thể gán speaker và giọng đọc riêng cho từng đoạn nếu video có nhiều nhân vật.
 - Bản nháp phụ đề sẽ được tự lưu trên trình duyệt trong quá trình chỉnh.
 
 ### 4. Chỉnh hiển thị trên video
@@ -133,8 +140,67 @@ http://127.0.0.1:8001
 - Lưu phụ đề gốc ra file `.srt` nếu cần giữ bản nhận diện ban đầu.
 - Lưu phụ đề đã dịch ra file `.srt` sau khi chỉnh sửa.
 - Xuất video phụ đề để tạo file `.mp4` có phụ đề tiếng Việt được gắn vào video.
+- Xuất video softsub để tạo file `.mkv` chứa nhiều track phụ đề mềm, gồm phụ đề gốc và phụ đề tiếng Việt.
 - Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
 - Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
+
+## Chạy Worker Riêng
+
+Mặc định web UI tự khởi động worker nền để xử lý tác vụ. Nếu muốn tách worker thành một service riêng, có thể chạy thêm lệnh:
+
+```powershell
+python -m app.main worker --scan-interval 5
+```
+
+Worker riêng sẽ quét các job đang `queued` hoặc `running` trong `workspace_data/jobs`, đưa lại vào hàng đợi và tự retry theo cấu hình `worker` trong `config.yaml`.
+
+Nếu muốn chỉ dùng worker riêng, đặt `worker.web_enabled: false` trong `config.yaml` để web UI không tự chạy worker nền.
+
+Cấu hình retry/backoff mẫu:
+
+```yaml
+worker:
+  web_enabled: true
+  backend: thread
+  broker_url: redis://localhost:6379/0
+  result_backend: redis://localhost:6379/1
+  max_attempts: 3
+  backoff_initial_sec: 5
+  backoff_factor: 2
+  backoff_max_sec: 60
+```
+
+Muốn dùng Celery/Redis thay cho worker thread, cài Redis và đặt:
+
+```yaml
+worker:
+  backend: celery
+  web_enabled: true
+  broker_url: redis://localhost:6379/0
+  result_backend: redis://localhost:6379/1
+  max_attempts: 3
+```
+
+Trong bản cấu hình local hiện tại, `config.yaml` đã được bật sẵn `worker.backend: celery`. Khi dùng chế độ này, nên mở 3 cửa sổ terminal theo thứ tự:
+
+```powershell
+run_redis_docker.bat
+run_worker.bat
+run_web.bat
+```
+
+- `run_redis_docker.bat`: bật Redis bằng Docker tại `localhost:6379` nếu máy có Docker Desktop.
+- `run_worker.bat`: bật Celery worker xử lý nhận diện, dịch, render và retry/backoff.
+- `run_web.bat`: bật giao diện web.
+- `check_celery_redis.bat`: kiểm tra nhanh dependency Celery/Redis và Redis server đã sẵn sàng chưa.
+
+Nếu không dùng Docker, hãy tự bật Redis sao cho truy cập được tại `redis://localhost:6379/0`, rồi chạy `run_worker.bat` và `run_web.bat`.
+
+Sau đó chạy worker:
+
+```powershell
+python -m app.main worker
+```
 
 ## Cấu Hình Dịch Và API
 
@@ -157,6 +223,14 @@ Các backend dịch thường dùng:
 - `gemini`: dùng Google Gemini API.
 - `llm-http`: dùng server tương thích OpenAI API, ví dụ một số server LLM nội bộ.
 
+Glossary thuật ngữ:
+
+- Có thể nhập glossary trong phần cài đặt API dịch để cố định cách dịch thuật ngữ kỹ thuật.
+- Mỗi dòng dùng một cặp `thuật ngữ gốc = bản dịch`, ví dụ `render = xuất video`.
+- Cũng có thể dùng CSV đơn giản dạng `source,target`.
+- Có thể dùng file JSON bằng CLI: `--glossary-json "C:\videos\glossary.json"`.
+- Glossary được đưa trực tiếp vào prompt của Gemini/OpenAI/LLM; với MyMemory/LibreTranslate hệ thống sẽ hậu xử lý để ưu tiên thuật ngữ đã đặt.
+
 Lưu ý khi dùng Gemini:
 
 - Tên model nên để dạng ngắn như `gemini-2.5-flash`, không nhập kèm tiền tố `models/` nếu giao diện hoặc cấu hình đã tự xử lý.
@@ -172,6 +246,9 @@ tts:
   voice: vi-VN-HoaiMyNeural
   background_audio_gain: 0.24
   voiceover_gain: 1.4
+  speaker_voice_map:
+    SPEAKER_00: vi-VN-NamMinhNeural
+    SPEAKER_01: vi-VN-HoaiMyNeural
 ```
 
 Một số giọng tiếng Việt thường dùng:
@@ -180,6 +257,8 @@ Một số giọng tiếng Việt thường dùng:
 - `vi-VN-NamMinhNeural`
 
 Khi xuất video thuyết minh, hệ thống sẽ dùng nội dung phụ đề tiếng Việt hiện tại. Nếu bạn đã sửa phụ đề trên web, hãy lưu phụ đề trước khi render để video thuyết minh dùng đúng nội dung mới nhất.
+
+Nếu một đoạn phụ đề có chọn `Giọng đoạn này`, hệ thống sẽ ưu tiên giọng đó thay cho giọng mặc định. Trường `Speaker` giúp phân nhóm nhân vật khi chỉnh video nhiều người nói.
 
 ## Thư Mục Kết Quả
 
@@ -198,6 +277,8 @@ workspace_data/jobs/<job_id>/subtitles/subtitles.vi.srt
 workspace_data/jobs/<job_id>/subtitles/subtitles.vi.vtt
 workspace_data/jobs/<job_id>/subtitles/subtitles.vi.ass
 workspace_data/jobs/<job_id>/renders/video.hardsub.mp4
+workspace_data/jobs/<job_id>/renders/video.softsub.mkv
+workspace_data/jobs/<job_id>/renders/video.softsub.ffmpeg.txt
 workspace_data/jobs/<job_id>/renders/video.voiceover.vi.mp4
 ```
 
@@ -207,6 +288,8 @@ workspace_data/jobs/<job_id>/renders/video.voiceover.vi.mp4
 - `subtitles.vi.srt`: phụ đề tiếng Việt sau dịch hoặc sau chỉnh sửa.
 - `subtitles.vi.ass`: phụ đề định dạng ASS dùng khi render video.
 - `video.hardsub.mp4`: video đã gắn phụ đề tiếng Việt.
+- `video.softsub.mkv`: video giữ hình ảnh gốc và mux nhiều track phụ đề mềm SRT.
+- `video.softsub.ffmpeg.txt`: câu lệnh FFmpeg dùng để mux softsub, giúp đối chiếu/kỹ thuật.
 - `video.voiceover.vi.mp4`: video thuyết minh tiếng Việt.
 
 ## Dùng Bằng Dòng Lệnh
@@ -221,6 +304,18 @@ Xử lý video và tạo phụ đề:
 
 ```powershell
 python -m app.main process --input "C:\videos\sample.mp4"
+```
+
+Dịch với glossary thuật ngữ:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4" --glossary "C:\videos\glossary.txt"
+```
+
+Dịch với glossary JSON:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4" --glossary-json "C:\videos\glossary.json"
 ```
 
 Xử lý video và xuất luôn video phụ đề:

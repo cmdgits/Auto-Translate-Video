@@ -52,3 +52,15 @@ tts:
   rate_ceil: 45
   background_audio_gain: 0.24
   voiceover_gain: 1.4
+  speaker_voice_map:
+    SPEAKER_00: vi-VN-NamMinhNeural
+    SPEAKER_01: vi-VN-HoaiMyNeural
+worker:
+  web_enabled: true
+  backend: thread
+  broker_url: redis://localhost:6379/0
+  result_backend: redis://localhost:6379/1
+  max_attempts: 3
+  backoff_initial_sec: 5
+  backoff_factor: 2
+  backoff_max_sec: 60

@@ -9,6 +9,7 @@ import httpx
 from app.core.exceptions import ProcessError
 from app.models import TranscriptSegment
 from app.translate.base import TranslatorBackend
+from app.translate.glossary import apply_glossary_replacements
 
 
 class MyMemoryTranslatorBackend(TranslatorBackend):
@@ -21,8 +22,9 @@ class MyMemoryTranslatorBackend(TranslatorBackend):
 
     BASE_URL = "https://api.mymemory.translated.net/get"
 
-    def __init__(self, email: str | None = None) -> None:
+    def __init__(self, email: str | None = None, glossary: dict[str, str] | None = None) -> None:
         self.email = email
+        self.glossary = glossary or {}
 
     def translate_segments(
         self,
@@ -60,7 +62,7 @@ class MyMemoryTranslatorBackend(TranslatorBackend):
                         "MyMemory không trả về bản dịch hợp lệ."
                     )
 
-                outputs.append(translated.strip())
+                outputs.append(apply_glossary_replacements(translated.strip(), self.glossary))
                 if progress_callback:
                     progress_callback(len(outputs) / total_segments)
 

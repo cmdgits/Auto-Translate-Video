@@ -9,6 +9,7 @@ description = "CapCut-inspired local video translation pipeline for Vietnamese s
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 dependencies = [
+  "celery[redis]>=5.4.0",
   "edge-tts>=7.2.0",
   "fastapi>=0.116.0",
   "faster-whisper>=1.1.0",

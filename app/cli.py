@@ -11,6 +11,7 @@ from rich.table import Table
 from app.config import AppConfig
 from app.core.exceptions import AppError
 from app.core.pipeline import VideoTranslationPipeline
+from app.core.worker import JobWorkerService
 from app.media.probe import probe_video
 from app.models import PipelineRunOptions
 
@@ -40,6 +41,8 @@ def process(
     gemini_base_url: str | None = typer.Option(None, help="Gemini API base URL."),
     libretranslate_url: str | None = typer.Option(None, help="URL dich LibreTranslate."),
     libretranslate_api_key: str | None = typer.Option(None, help="API key LibreTranslate."),
+    glossary: Path | None = typer.Option(None, help="File glossary, moi dong dang source=target hoac source,target."),
+    glossary_json: Path | None = typer.Option(None, help="File glossary JSON, vi du glossary.json."),
     hardsub: bool = typer.Option(False, help="Render video burn subtitle ngay sau khi tao SRT."),
     voiceover: bool = typer.Option(False, help="Render voice-over tieng Viet ngay sau khi tao subtitle."),
     voice_name: str | None = typer.Option(None, help="Ten voice edge-tts, vi du vi-VN-HoaiMyNeural."),
@@ -63,6 +66,8 @@ def process(
         gemini_model=gemini_model,
         libretranslate_url=libretranslate_url,
         libretranslate_api_key=libretranslate_api_key,
+        glossary_text=glossary.read_text(encoding="utf-8") if glossary else None,
+        glossary_json_path=str(glossary_json) if glossary_json else None,
         render_hardsub=hardsub,
         generate_voiceover=voiceover,
         voice_name=voice_name,
@@ -155,3 +160,30 @@ def web(
     import webbrowser
     threading.Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}/")).start()
     uvicorn.run("app.web.main:app", host=host, port=port, reload=reload, factory=False)
+
+
+@app.command("worker")
+def worker(
+    config: Path | None = typer.Option(None, help="Duong dan config YAML."),
+    scan_interval: float = typer.Option(5.0, help="So giay giua moi lan quet job queued/running."),
+) -> None:
+    """Chay queue worker nhu mot service rieng."""
+    pipeline = _load_pipeline(config)
+    if pipeline.config.worker.backend.lower() == "celery":
+        from app.core.celery_app import celery_app
+
+        console.print("[green]Dang chay Celery worker. Hay dam bao Redis dang bat.[/green]")
+        celery_app.worker_main(["worker", "--loglevel=INFO", "--pool=solo"])
+        return
+    service = JobWorkerService(lambda: pipeline)
+    service.start_scanner(scan_interval)
+    resumed = service.resume_pending()
+    console.print(f"[green]Worker dang chay.[/green] Da dua lai {resumed} tac vu vao hang doi.")
+    console.print("Nhan Ctrl+C de dung worker.")
+    try:
+        while True:
+            import time
+
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        console.print("[yellow]Da dung worker.[/yellow]")

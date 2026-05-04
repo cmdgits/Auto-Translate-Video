@@ -21,6 +21,7 @@ class VoiceClip:
     end: float
     path: Path
     text: str
+    voice_name: str | None = None
 
 
 def estimate_edge_tts_rate(text: str, start: float, end: float, floor: int, ceil: int) -> int:
@@ -74,6 +75,9 @@ class EdgeTTSBackend:
                 if progress_callback:
                     progress_callback(index / total_segments)
                 continue
+            speaker_key = (segment.speaker or "").strip()
+            mapped_voice_name = self.config.speaker_voice_map.get(speaker_key) if speaker_key else None
+            segment_voice_name = (segment.voice_name or mapped_voice_name or self.voice_name).strip()
             clip_path = output_dir / f"segment_{segment.id:04d}.mp3"
             if clip_path.exists():
                 clip_path.unlink()
@@ -85,10 +89,10 @@ class EdgeTTSBackend:
                 self.config.rate_ceil,
             )
             try:
-                await self._save_clip(edge_tts, spoken_text, clip_path, rate_value)
+                await self._save_clip(edge_tts, spoken_text, clip_path, rate_value, segment_voice_name)
             except Exception as exc:
                 try:
-                    await self._save_clip(edge_tts, spoken_text, clip_path, 0)
+                    await self._save_clip(edge_tts, spoken_text, clip_path, 0, segment_voice_name)
                 except Exception as retry_exc:
                     if clip_path.exists():
                         clip_path.unlink()
@@ -114,16 +118,17 @@ class EdgeTTSBackend:
                     end=segment.end,
                     path=clip_path,
                     text=spoken_text,
+                    voice_name=segment_voice_name,
                 )
             )
             if progress_callback:
                 progress_callback(index / total_segments)
         return clips
 
-    async def _save_clip(self, edge_tts, spoken_text: str, clip_path: Path, rate_value: int) -> None:
+    async def _save_clip(self, edge_tts, spoken_text: str, clip_path: Path, rate_value: int, voice_name: str) -> None:
         communicate = edge_tts.Communicate(
             spoken_text,
-            voice=self.voice_name,
+            voice=voice_name,
             rate=f"{rate_value:+d}%",
         )
         await communicate.save(str(clip_path))
