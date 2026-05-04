@@ -632,25 +632,6 @@ button {
   transition: width 0.25s ease;
 }
 
-.import-button,
-.export-button {
-  min-height: 34px;
-  padding: 0 16px;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.import-button {
-  background: #111827;
-  color: #fff;
-  font-weight: 900;
-}
-
-.import-button.compact-import {
-  border: 0;
-  background: #111827;
-}
-
 .export-button {
   background: #27aee8;
   color: #fff;
@@ -661,7 +642,6 @@ button {
   background: #10c99b;
 }
 
-.import-button:hover,
 .export-button:hover {
   filter: brightness(1.12);
 }
@@ -951,11 +931,7 @@ body.dragging-subtitle * {
   background: #f7fafc;
 }
 
-.import-group {
-  border-color: #111827;
-  background: #111827;
-}
-
+.import-group,
 .edit-action-group {
   border-color: #dbeafe;
   background: #f8fbff;
@@ -963,10 +939,6 @@ body.dragging-subtitle * {
 
 .compact-import {
   flex: 0 0 auto;
-  min-height: 28px;
-  padding: 0 16px;
-  border-radius: 11px;
-  font-size: 12px;
 }
 
 .file-format-group,
@@ -975,7 +947,8 @@ body.dragging-subtitle * {
   overflow: hidden;
 }
 
-.edit-action-group .secondary-action {
+.edit-action-group .secondary-action,
+.compact-import {
   min-height: 28px;
   padding: 0 12px;
   border: 0;
@@ -983,9 +956,11 @@ body.dragging-subtitle * {
   background: transparent;
   color: #24415f;
   font-size: 12px;
+  font-weight: 800;
 }
 
-.edit-action-group .secondary-action:hover {
+.edit-action-group .secondary-action:hover,
+.compact-import:hover {
   background: #eaf3ff;
   color: #075985;
 }
