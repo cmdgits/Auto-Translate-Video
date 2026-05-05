@@ -63,7 +63,6 @@ def blur_text_in_video_with_ocr(
             *video_encode_args,
             "-c:a",
             "copy",
-            "-shortest",
             "-movflags",
             "+faststart",
             str(output_video),

@@ -90,13 +90,27 @@ def video_encode_args(render_config: RenderConfig) -> list[str]:
     quality = str(render_config.crf)
     args = ["-c:v", codec]
     if codec in {"libx264", "libx265"}:
-        return [*args, "-preset", preset, "-crf", quality]
+        return [*args, "-preset", preset, "-crf", quality, "-pix_fmt", "yuv420p"]
     if codec == "h264_nvenc":
-        return [*args, "-preset", preset, "-rc", "vbr", "-cq", quality, "-b:v", "0"]
+        return [*args, "-preset", preset, "-rc", "vbr", "-cq", quality, "-b:v", "0", "-pix_fmt", "yuv420p"]
     if codec == "h264_qsv":
-        return [*args, "-preset", preset, "-global_quality", quality]
+        return [*args, "-preset", preset, "-global_quality", quality, "-pix_fmt", "yuv420p"]
     if codec == "h264_amf":
-        return [*args, "-quality", preset, "-rc", "cqp", "-qp_i", quality, "-qp_p", quality, "-qp_b", quality]
+        return [
+            *args,
+            "-quality",
+            preset,
+            "-rc",
+            "cqp",
+            "-qp_i",
+            quality,
+            "-qp_p",
+            quality,
+            "-qp_b",
+            quality,
+            "-pix_fmt",
+            "yuv420p",
+        ]
     return [*args, "-preset", preset]
 
 
