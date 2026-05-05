@@ -16,11 +16,4 @@ $ffmpegBin = Join-Path $projectRoot "tools\ffmpeg\bin"
 if (Test-Path (Join-Path $ffmpegBin "ffmpeg.exe")) {
   $env:PATH = "$ffmpegBin;$env:PATH"
 }
-$tesseractExe = Join-Path $projectRoot "tools\Tesseract-OCR\tesseract.exe"
-if (Test-Path $tesseractExe) {
-  $tesseractDir = Split-Path -Parent $tesseractExe
-  $env:TESSERACT_CMD = $tesseractExe
-  $env:TESSDATA_PREFIX = Join-Path $tesseractDir "tessdata"
-  $env:PATH = "$tesseractDir;$env:PATH"
-}
 & $python -m app.main web --host 127.0.0.1 --port 8001

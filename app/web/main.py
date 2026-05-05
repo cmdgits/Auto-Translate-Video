@@ -280,7 +280,7 @@ def _options_from_form(
         subtitle_font_size=subtitle_font_size,
         subtitle_position_x=subtitle_position_x,
         subtitle_position_y=subtitle_position_y,
-        subtitle_cover_mode=subtitle_cover_mode if subtitle_cover_mode in {"none", "blur", "box"} else None,
+        subtitle_cover_mode=subtitle_cover_mode if subtitle_cover_mode in {"none", "box"} else None,
         subtitle_cover_opacity=subtitle_cover_opacity,
         subtitle_cover_height_ratio=subtitle_cover_height_ratio,
         subtitle_cover_width_ratio=subtitle_cover_width_ratio,

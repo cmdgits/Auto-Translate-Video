@@ -212,13 +212,9 @@
                   <span>Kiểu</span>
                   <select id="subtitleCoverModeSelect" aria-label="Kiểu che chữ gốc">
                     <option value="none">Không che</option>
-                    <option value="blur" selected>Gaussian Blur OCR</option>
-                    <option value="box">Làm mờ</option>
+                    <option value="box" selected>Làm mờ</option>
                   </select>
                 </label>
-                <div class="cover-blur-note subtitle-style-control">
-                  Tự nhận diện chữ bằng OCR, xuất sẽ lâu hơn.
-                </div>
                 <label class="zoom-control subtitle-style-control cover-box-control">
                   <span>Mức mờ</span>
                   <input id="subtitleCoverRange" type="range" min="0" max="100" step="5" value="72" />
@@ -248,7 +244,7 @@
         <section class="canvas-area">
           <h2 class="canvas-title" id="videoName">Chưa chọn video</h2>
           <div class="canvas-frame" id="canvasFrame">
-            <video id="videoPreview" controls preload="metadata"></video>
+            <video id="videoPreview" preload="metadata"></video>
             <div class="original-subtitle-cover hidden" id="originalSubtitleCover"></div>
             <div class="subtitle-overlay hidden" id="subtitleOverlay"></div>
             <div class="empty-state" id="emptyState">

@@ -14,7 +14,7 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Phóng to, thu nhỏ video và timeline để canh vị trí, thời gian hiển thị phụ đề dễ hơn.
 - Kéo cả đoạn phụ đề hoặc kéo mép trái/phải để chỉnh thời gian, có snap nhẹ theo playhead.
 - Tùy chỉnh kích thước, vị trí và vùng hiển thị phụ đề trên video.
-- Làm mờ chữ gốc bằng OCR Gaussian Blur: nhận diện bounding box chữ bằng Tesseract, chỉ blur ROI bằng `cv2.GaussianBlur`, không vẽ khối màu đè lên chữ.
+- Làm mờ vùng chữ gốc bằng bộ lọc FFmpeg.
 - Tự lưu nháp phụ đề trên trình duyệt để tránh mất nội dung khi đang sửa.
 - Có nút dừng tác vụ khi dịch, tạo phụ đề hoặc render quá lâu.
 - Queue worker xử lý tác vụ nền, có thể chạy trong web hoặc chạy như service riêng bằng CLI.
@@ -29,7 +29,6 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Windows 10/11 được khuyến nghị.
 - Python `3.12` được khuyến nghị. Dự án hỗ trợ Python `>=3.11,<3.15`, nhưng không nên dùng Python `3.14` cho web UI trên Windows vì `faster-whisper`/`ctranslate2` có thể lỗi.
 - FFmpeg và FFprobe phải dùng được bằng lệnh `ffmpeg` và `ffprobe`, hoặc được cấu hình trong `config.yaml`.
-- Tesseract OCR cần có nếu muốn dùng chế độ OCR Gaussian Blur để làm mờ chữ gốc chính xác theo bounding box. File `install_all.bat` sẽ tự cài Tesseract portable vào `tools\Tesseract-OCR` nếu máy chưa có.
 - Cần Internet nếu dùng dịch qua Gemini, OpenAI, LibreTranslate online hoặc tạo giọng đọc bằng `edge-tts`.
 - GPU NVIDIA là tùy chọn; nếu có, hệ thống tự ưu tiên `cuda` cho nhận diện phụ đề ASR và tự fallback CPU nếu CUDA không dùng được.
 
@@ -48,7 +47,6 @@ File này sẽ tự chuẩn bị các phần cần thiết:
 - Tải và cài Python portable vào `tools\Python312` nếu máy chưa có.
 - Cài toàn bộ thư viện Python của dự án.
 - Tải và giải nén FFmpeg portable vào `tools\ffmpeg` nếu chưa có.
-- Kiểm tra và tự cài Tesseract OCR portable vào `tools\Tesseract-OCR` nếu chưa có; đồng thời tải dữ liệu OCR `eng`, `chi_sim`, `chi_tra` để dùng Gaussian Blur.
 - Tạo `config.yaml`, `.env` và các thư mục dữ liệu trong `workspace_data`.
 - Cấu hình worker mặc định là `thread` để chạy được bằng `run_web.bat` mà không bắt buộc Redis/Celery.
 - Tải model `faster-whisper-tiny` vào `models\faster-whisper-tiny` nếu có Internet, giúp lần tạo tác vụ đầu tiên ít bị chờ tải model.
@@ -61,13 +59,7 @@ run_web.bat
 
 Khi muốn chuyển sang máy khác, copy cả thư mục `Auto-Translate-Video` sang máy mới rồi chạy lại `install_all.bat` nếu máy đó còn thiếu Python, FFmpeg hoặc thư viện.
 
-Nếu chỉ muốn cài riêng Tesseract OCR, chạy:
-
-```text
-install_all.bat --install-tesseract-only
-```
-
-Nếu `install_all.bat` đứng ở bước tải Python hoặc Tesseract, thường là do mạng hoặc firewall chặn nguồn tải. Script sẽ tự thử `curl`, có timeout và fallback sang cách cài khác khi có thể. Nếu vẫn không được, hãy tải tay file theo link script hiển thị, đặt vào thư mục `tools`, rồi chạy lại `install_all.bat`.
+Nếu `install_all.bat` đứng ở bước tải Python hoặc FFmpeg, thường là do mạng hoặc firewall chặn nguồn tải. Script sẽ tự thử `curl`, có timeout và fallback sang cách cài khác khi có thể. Nếu vẫn không được, hãy tải tay file theo link script hiển thị, đặt vào thư mục `tools`, rồi chạy lại `install_all.bat`.
 
 ### 1. Tải mã nguồn
 
@@ -167,7 +159,7 @@ http://127.0.0.1:8001
 
 - Chọn chế độ xem phụ đề để kiểm tra chữ hiển thị trên video.
 - Tùy chỉnh cỡ chữ, vị trí, vùng đặt phụ đề và độ che phủ chữ gốc.
-- Nếu video có chữ gốc, có thể dùng blur/mask để làm mờ vùng chữ cũ thay vì phủ màu cứng.
+- Nếu video có chữ gốc, có thể dùng chế độ làm mờ vùng chữ cũ thay vì phủ màu cứng.
 - Khi phóng to hoặc thu nhỏ video, phụ đề sẽ co giãn theo khung video để dễ canh chỉnh.
 
 ### 5. Lưu và xuất kết quả

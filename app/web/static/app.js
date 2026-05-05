@@ -277,7 +277,7 @@ const state = {
     size: 32,
     x: 50,
     y: 8,
-    coverMode: "blur",
+    coverMode: "box",
     coverOpacity: 72,
     coverHeight: 7,
     coverWidth: 86,
@@ -698,6 +698,7 @@ function hasPreviewVideo() {
 }
 
 function updateVideoPlaybackControls() {
+  videoPreview.controls = false;
   const canControl = hasPreviewVideo();
   [videoBackBtn, videoPlayPauseBtn, videoForwardBtn].forEach((button) => {
     if (button) {
@@ -772,14 +773,17 @@ function applySubtitleOverlayScale() {
 }
 
 function applySubtitleStyle(nextStyle = {}) {
-  const coverMode = ["none", "blur", "box"].includes(nextStyle.coverMode)
+  let coverMode = ["none", "box"].includes(nextStyle.coverMode)
     ? nextStyle.coverMode
     : state.subtitleStyle.coverMode;
+  if (coverMode === "blur" || !["none", "box"].includes(coverMode)) {
+    coverMode = "box";
+  }
   state.subtitleStyle = {
     size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 64, 32),
     x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 10, 90, 50),
     y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 3, 45, 8),
-    coverMode: coverMode || "blur",
+    coverMode: coverMode || "box",
     coverOpacity: clampNumber(nextStyle.coverOpacity ?? state.subtitleStyle.coverOpacity, 0, 100, 72),
     coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 3, 16, 7),
     coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 28, 96, 86),
@@ -812,10 +816,8 @@ function applySubtitleStyle(nextStyle = {}) {
     ? `blur(${Math.max(4, Math.round(state.subtitleStyle.coverOpacity / 8))}px)`
     : "none";
   originalSubtitleCover.style.background = "transparent";
-  originalSubtitleCover.classList.toggle("blur-cover", state.subtitleStyle.coverMode === "blur");
   originalSubtitleCover.classList.toggle("box-cover", state.subtitleStyle.coverMode === "box");
   document.body.classList.toggle("cover-mode-none", state.subtitleStyle.coverMode === "none");
-  document.body.classList.toggle("cover-mode-blur", state.subtitleStyle.coverMode === "blur");
   document.body.classList.toggle("cover-mode-box", state.subtitleStyle.coverMode === "box");
 
   subtitleSizeRange.value = String(state.subtitleStyle.size);
@@ -1184,16 +1186,10 @@ function stageLabel(stage) {
 }
 
 function renderProgressText(job, percent) {
-  if (job?.stage === "rendering_hardsub" && percent > 0 && percent < 55) {
-    return `Đang nhận diện chữ gốc để làm mờ ${percent}%`;
-  }
   return `${stageLabel(job?.stage || "queued")} ${percent}%`;
 }
 
 function coverRenderDescription() {
-  if (state.subtitleStyle.coverMode === "blur") {
-    return "Gaussian Blur OCR đang bật nên xuất sẽ lâu hơn.";
-  }
   if (state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0) {
     return "Làm mờ vùng chữ gốc đang bật.";
   }
@@ -2480,12 +2476,9 @@ async function renderSoftsubFromCurrentSubtitles() {
   if (!state.jobId || softsubLink.classList.contains("disabled")) {
     return;
   }
-  const coverEnabled = state.subtitleStyle.coverMode === "blur"
-    || (state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0);
+  const coverEnabled = state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0;
   setStatus(
-    state.subtitleStyle.coverMode === "blur"
-      ? "Đang xuất MKV softsub có Gaussian Blur OCR, bước này sẽ lâu hơn vì cần render lại hình..."
-      : coverEnabled
+    coverEnabled
       ? "Đang xuất MKV softsub có làm mờ vùng chữ gốc..."
       : "Đang xuất MKV softsub gồm nhiều track phụ đề...",
     "neutral",
