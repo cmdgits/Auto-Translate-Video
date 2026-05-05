@@ -108,6 +108,8 @@ class SubtitleConfig(BaseModel):
 class RenderConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
+    encoder: str = "cpu"
+    quality_preset: str = "balanced"
     video_codec: str = "libx264"
     preset: str = "medium"
     crf: int = 20

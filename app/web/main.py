@@ -5,6 +5,7 @@ import sys
 import threading
 from functools import lru_cache
 from pathlib import Path
+from typing import Callable
 
 from fastapi import Body
 from fastapi import File, Form, HTTPException, Request, UploadFile
@@ -154,6 +155,42 @@ def _start_local_render(job_id: str, task_type: str, target) -> bool:
     return True
 
 
+def _queue_local_render(
+    job_id: str,
+    *,
+    task_type: str,
+    stage: str,
+    options: PipelineRunOptions | None,
+    render: Callable[[str, PipelineRunOptions], JobManifest],
+    option_updates: dict[str, object] | None = None,
+) -> JobManifest:
+    manifest = _get_manifest_or_404(job_id)
+    if manifest.status in {"queued", "running"} and manifest.stage == stage and _has_active_local_render(job_id, task_type):
+        return manifest
+
+    run_options = (options or PipelineRunOptions()).model_copy(update=option_updates or {})
+    queued_manifest = manifest.model_copy(
+        update={
+            "status": "queued",
+            "stage": stage,
+            "progress": 0.0,
+            "task_type": task_type,
+            "options": {**(manifest.options or {}), **sanitize_pipeline_options(run_options)},
+            "errors": [],
+        }
+    )
+    get_pipeline().jobs.update_manifest(queued_manifest)
+
+    def run_render() -> None:
+        try:
+            render(job_id, run_options)
+        except Exception:
+            return
+
+    _start_local_render(job_id, task_type, run_render)
+    return queued_manifest
+
+
 def _mark_job_running(job_id: str, stage: str, progress: float) -> JobManifest:
     pipeline = get_pipeline()
     manifest = pipeline.jobs.load_manifest(job_id)
@@ -197,6 +234,8 @@ def _options_from_form(
     voice_name: str | None,
     voiceover_gain: float | None,
     background_audio_gain: float | None,
+    render_encoder: str | None = None,
+    render_preset: str | None = None,
     subtitle_font_size: float | None = None,
     subtitle_position_x: float | None = None,
     subtitle_position_y: float | None = None,
@@ -235,6 +274,8 @@ def _options_from_form(
         voice_name=voice_name or None,
         voiceover_gain=voiceover_gain,
         background_audio_gain=background_audio_gain,
+        render_encoder=render_encoder if render_encoder in {"cpu", "nvidia", "intel", "amd"} else None,
+        render_preset=render_preset if render_preset in {"fast", "balanced", "quality"} else None,
         subtitle_font_size=subtitle_font_size,
         subtitle_position_x=subtitle_position_x,
         subtitle_position_y=subtitle_position_y,
@@ -341,6 +382,8 @@ async def create_job(
     voice_name: str | None = Form(None),
     voiceover_gain: float | None = Form(None),
     background_audio_gain: float | None = Form(None),
+    render_encoder: str | None = Form(None),
+    render_preset: str | None = Form(None),
     subtitle_font_size: float | None = Form(None),
     subtitle_position_x: float | None = Form(None),
     subtitle_position_y: float | None = Form(None),
@@ -368,6 +411,8 @@ async def create_job(
         voice_name,
         voiceover_gain,
         background_audio_gain,
+        render_encoder,
+        render_preset,
         subtitle_font_size,
         subtitle_position_x,
         subtitle_position_y,
@@ -401,6 +446,8 @@ async def create_batch_jobs(
     voice_name: str | None = Form(None),
     voiceover_gain: float | None = Form(None),
     background_audio_gain: float | None = Form(None),
+    render_encoder: str | None = Form(None),
+    render_preset: str | None = Form(None),
     subtitle_font_size: float | None = Form(None),
     subtitle_position_x: float | None = Form(None),
     subtitle_position_y: float | None = Form(None),
@@ -430,6 +477,8 @@ async def create_batch_jobs(
         voice_name,
         voiceover_gain,
         background_audio_gain,
+        render_encoder,
+        render_preset,
         subtitle_font_size,
         subtitle_position_x,
         subtitle_position_y,
@@ -499,40 +548,26 @@ async def render_hardsub(
     job_id: str,
     options: PipelineRunOptions | None = Body(default=None),
 ) -> JSONResponse:
-    manifest = get_job_queue().enqueue_existing(job_id, "render_hardsub", options or PipelineRunOptions())
-    return JSONResponse(_manifest_payload(manifest))
+    queued_manifest = _queue_local_render(
+        job_id,
+        task_type="render_hardsub",
+        stage="rendering_hardsub",
+        options=options,
+        render=get_pipeline().render_hardsub,
+        option_updates={"render_hardsub": True},
+    )
+    return JSONResponse(_manifest_payload(queued_manifest))
 
 
 @app.post("/api/jobs/{job_id}/render/softsub")
 async def render_softsub(job_id: str, options: PipelineRunOptions | None = Body(default=None)) -> JSONResponse:
-    manifest = _get_manifest_or_404(job_id)
-    if (
-        manifest.status in {"queued", "running"}
-        and manifest.stage == "rendering_softsub"
-        and _has_active_local_render(job_id, "render_softsub")
-    ):
-        return JSONResponse(_manifest_payload(manifest))
-
-    run_options = options or PipelineRunOptions()
-    queued_manifest = manifest.model_copy(
-        update={
-            "status": "queued",
-            "stage": "rendering_softsub",
-            "progress": 0.0,
-            "task_type": "render_softsub",
-            "options": {**(manifest.options or {}), **sanitize_pipeline_options(run_options)},
-            "errors": [],
-        }
+    queued_manifest = _queue_local_render(
+        job_id,
+        task_type="render_softsub",
+        stage="rendering_softsub",
+        options=options,
+        render=get_pipeline().render_softsub,
     )
-    get_pipeline().jobs.update_manifest(queued_manifest)
-
-    def run_softsub_render() -> None:
-        try:
-            get_pipeline().render_softsub(job_id, run_options)
-        except Exception:
-            return
-
-    _start_local_render(job_id, "render_softsub", run_softsub_render)
     return JSONResponse(_manifest_payload(queued_manifest))
 
 
@@ -558,34 +593,14 @@ async def render_voiceover(
     job_id: str,
     options: PipelineRunOptions | None = Body(default=None),
 ) -> JSONResponse:
-    manifest = _get_manifest_or_404(job_id)
-    if (
-        manifest.status in {"queued", "running"}
-        and manifest.stage == "rendering_voiceover"
-        and _has_active_local_render(job_id, "render_voiceover")
-    ):
-        return JSONResponse(_manifest_payload(manifest))
-
-    render_options = (options or PipelineRunOptions()).model_copy(update={"generate_voiceover": True})
-    queued_manifest = manifest.model_copy(
-        update={
-            "status": "queued",
-            "stage": "rendering_voiceover",
-            "progress": 0.0,
-            "task_type": "render_voiceover",
-            "options": {**(manifest.options or {}), **sanitize_pipeline_options(render_options)},
-            "errors": [],
-        }
+    queued_manifest = _queue_local_render(
+        job_id,
+        task_type="render_voiceover",
+        stage="rendering_voiceover",
+        options=options,
+        render=get_pipeline().render_voiceover,
+        option_updates={"generate_voiceover": True},
     )
-    get_pipeline().jobs.update_manifest(queued_manifest)
-
-    def run_voiceover_render() -> None:
-        try:
-            get_pipeline().render_voiceover(job_id, render_options)
-        except Exception:
-            return
-
-    _start_local_render(job_id, "render_voiceover", run_voiceover_render)
     return JSONResponse(_manifest_payload(queued_manifest))
 
 

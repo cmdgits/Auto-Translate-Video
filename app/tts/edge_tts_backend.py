@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import unicodedata
 from dataclasses import dataclass
@@ -37,6 +39,27 @@ def sanitize_tts_text(text: str) -> str:
     compact_text = " ".join(str(text or "").split())
     cleaned_text = "".join(character for character in compact_text if not unicodedata.category(character).startswith("C"))
     return " ".join(cleaned_text.split())
+
+
+def tts_clip_signature(spoken_text: str, voice_name: str, rate_value: int) -> str:
+    payload = {
+        "backend": "edge-tts-v1",
+        "rate": rate_value,
+        "text": spoken_text,
+        "voice": voice_name,
+    }
+    raw_payload = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(raw_payload.encode("utf-8")).hexdigest()[:16]
+
+
+def remove_stale_segment_clips(output_dir: Path, segment_id: int, keep_path: Path) -> None:
+    for old_clip in output_dir.glob(f"segment_{segment_id:04d}*.mp3"):
+        if old_clip == keep_path:
+            continue
+        try:
+            old_clip.unlink()
+        except OSError:
+            logger.debug("Khong xoa duoc file TTS cache cu: %s", old_clip)
 
 
 class EdgeTTSBackend:
@@ -78,9 +101,6 @@ class EdgeTTSBackend:
             speaker_key = (segment.speaker or "").strip()
             mapped_voice_name = self.config.speaker_voice_map.get(speaker_key) if speaker_key else None
             segment_voice_name = (segment.voice_name or mapped_voice_name or self.voice_name).strip()
-            clip_path = output_dir / f"segment_{segment.id:04d}.mp3"
-            if clip_path.exists():
-                clip_path.unlink()
             rate_value = estimate_edge_tts_rate(
                 spoken_text,
                 segment.start,
@@ -88,20 +108,27 @@ class EdgeTTSBackend:
                 self.config.rate_floor,
                 self.config.rate_ceil,
             )
-            try:
-                await self._save_clip(edge_tts, spoken_text, clip_path, rate_value, segment_voice_name)
-            except Exception as exc:
+            clip_signature = tts_clip_signature(spoken_text, segment_voice_name, rate_value)
+            clip_path = output_dir / f"segment_{segment.id:04d}_{clip_signature}.mp3"
+            if not clip_path.exists() or clip_path.stat().st_size <= 0:
                 try:
-                    await self._save_clip(edge_tts, spoken_text, clip_path, 0, segment_voice_name)
-                except Exception as retry_exc:
-                    if clip_path.exists():
-                        clip_path.unlink()
-                    message = f"Bỏ qua đoạn {segment.id}: Edge TTS không tạo được audio ({retry_exc})"
-                    self.warnings.append(message)
-                    logger.warning(message, exc_info=exc)
-                    if progress_callback:
-                        progress_callback(index / total_segments)
-                    continue
+                    await self._save_clip(edge_tts, spoken_text, clip_path, rate_value, segment_voice_name)
+                except Exception as exc:
+                    fallback_rate_value = 0
+                    fallback_signature = tts_clip_signature(spoken_text, segment_voice_name, fallback_rate_value)
+                    fallback_clip_path = output_dir / f"segment_{segment.id:04d}_{fallback_signature}.mp3"
+                    try:
+                        await self._save_clip(edge_tts, spoken_text, fallback_clip_path, fallback_rate_value, segment_voice_name)
+                        clip_path = fallback_clip_path
+                    except Exception as retry_exc:
+                        if fallback_clip_path.exists():
+                            fallback_clip_path.unlink()
+                        message = f"Bỏ qua đoạn {segment.id}: Edge TTS không tạo được audio ({retry_exc})"
+                        self.warnings.append(message)
+                        logger.warning(message, exc_info=exc)
+                        if progress_callback:
+                            progress_callback(index / total_segments)
+                        continue
             if not clip_path.exists() or clip_path.stat().st_size <= 0:
                 if clip_path.exists():
                     clip_path.unlink()
@@ -111,6 +138,7 @@ class EdgeTTSBackend:
                 if progress_callback:
                     progress_callback(index / total_segments)
                 continue
+            remove_stale_segment_clips(output_dir, segment.id, clip_path)
             clips.append(
                 VoiceClip(
                     segment_id=segment.id,
@@ -126,9 +154,17 @@ class EdgeTTSBackend:
         return clips
 
     async def _save_clip(self, edge_tts, spoken_text: str, clip_path: Path, rate_value: int, voice_name: str) -> None:
+        temporary_path = clip_path.with_name(f"{clip_path.stem}.tmp{clip_path.suffix}")
+        if temporary_path.exists():
+            temporary_path.unlink()
         communicate = edge_tts.Communicate(
             spoken_text,
             voice=voice_name,
             rate=f"{rate_value:+d}%",
         )
-        await communicate.save(str(clip_path))
+        await communicate.save(str(temporary_path))
+        if not temporary_path.exists() or temporary_path.stat().st_size <= 0:
+            if temporary_path.exists():
+                temporary_path.unlink()
+            raise RuntimeError("Edge TTS tra ve file audio rong")
+        temporary_path.replace(clip_path)

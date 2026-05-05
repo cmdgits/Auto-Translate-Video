@@ -36,6 +36,8 @@ subtitles:
   min_duration_sec: 1.1
   max_duration_sec: 7.0
 render:
+  encoder: cpu
+  quality_preset: balanced
   video_codec: libx264
   preset: medium
   crf: 20

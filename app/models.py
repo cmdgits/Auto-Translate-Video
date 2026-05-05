@@ -70,6 +70,8 @@ class PipelineRunOptions(BaseModel):
     voice_name: str | None = None
     voiceover_gain: float | None = None
     background_audio_gain: float | None = None
+    render_encoder: Literal["cpu", "nvidia", "intel", "amd"] | None = None
+    render_preset: Literal["fast", "balanced", "quality"] | None = None
     subtitle_font_size: float | None = None
     subtitle_position_x: float | None = None
     subtitle_position_y: float | None = None

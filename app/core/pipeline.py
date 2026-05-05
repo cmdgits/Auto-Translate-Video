@@ -43,8 +43,8 @@ SUBTITLE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_-]{2,12}$")
 def ensure_video_has_audio(metadata: VideoMetadata) -> None:
     if metadata.audio_stream_index is None:
         raise ProcessError(
-            "Video nÃ y khÃ´ng cÃ³ luá»“ng Ã¢m thanh, nÃªn khÃ´ng thá»ƒ tÃ¡ch audio Ä‘á»ƒ nháº­n dáº¡ng giá»ng nÃ³i. "
-            "HÃ£y chá»n video cÃ³ audio hoáº·c táº£i láº¡i báº£n cÃ³ Ã¢m thanh."
+            "Video này không có luồng âm thanh, nên không thể tách audio để nhận dạng giọng nói. "
+            "Hãy chọn video có audio hoặc tải lại bản có âm thanh."
         )
 
 
@@ -53,7 +53,7 @@ class VideoTranslationPipeline:
         self.config = config
         self.jobs = JobManager(config.directories.jobs_dir)
 
-    def cancel_job(self, job_id: str, reason: str = "TÃ¡c vá»¥ Ä‘Ã£ Ä‘Æ°á»£c dá»«ng theo yÃªu cáº§u.") -> JobManifest:
+    def cancel_job(self, job_id: str, reason: str = "Tác vụ đã được dừng theo yêu cầu.") -> JobManifest:
         context, manifest = self._require_job(job_id)
         if manifest.status not in {"queued", "running"}:
             return manifest
@@ -72,7 +72,7 @@ class VideoTranslationPipeline:
     def _raise_if_cancelled(self, context: JobContext) -> None:
         manifest = self.jobs.load_manifest(context.job_id)
         if manifest and manifest.status == "cancelled":
-            raise JobCancelledError(manifest.errors[0] if manifest.errors else "TÃ¡c vá»¥ Ä‘Ã£ Ä‘Æ°á»£c dá»«ng.")
+            raise JobCancelledError(manifest.errors[0] if manifest.errors else "Tác vụ đã được dừng.")
 
     def _emit_running(self, context: JobContext, manifest: JobManifest, progress_hook: ProgressHook | None) -> None:
         self._raise_if_cancelled(context)
@@ -725,9 +725,12 @@ class VideoTranslationPipeline:
         return subtitle_tracks, default_subtitle_index
 
     def _render_config_for_options(self, options: PipelineRunOptions | None = None) -> RenderConfig:
+        updates = self._render_encoder_updates(
+            encoder=options.render_encoder if options else None,
+            preset=options.render_preset if options else None,
+        )
         if not options:
-            return self.config.render
-        updates = {}
+            return self.config.render.model_copy(update=updates) if updates else self.config.render
         if options.subtitle_cover_mode:
             updates["subtitle_cover_mode"] = options.subtitle_cover_mode
         if options.subtitle_cover_opacity is not None:
@@ -736,6 +739,37 @@ class VideoTranslationPipeline:
         if options.subtitle_cover_height_ratio is not None:
             updates["subtitle_cover_height_ratio"] = max(0.05, min(0.45, float(options.subtitle_cover_height_ratio)))
         return self.config.render.model_copy(update=updates) if updates else self.config.render
+
+    def _render_encoder_updates(self, encoder: str | None = None, preset: str | None = None) -> dict[str, object]:
+        selected_encoder = (encoder or self.config.render.encoder or "cpu").strip().lower()
+        selected_preset = (preset or self.config.render.quality_preset or "balanced").strip().lower()
+        selected_encoder = selected_encoder if selected_encoder in {"cpu", "nvidia", "intel", "amd"} else "cpu"
+        selected_preset = selected_preset if selected_preset in {"fast", "balanced", "quality"} else "balanced"
+
+        cpu_presets = {
+            "fast": {"video_codec": "libx264", "preset": "veryfast", "crf": 22},
+            "balanced": {"video_codec": "libx264", "preset": "medium", "crf": 20},
+            "quality": {"video_codec": "libx264", "preset": "slow", "crf": 18},
+        }
+        hardware_presets = {
+            "nvidia": {
+                "fast": {"video_codec": "h264_nvenc", "preset": "fast", "crf": 23},
+                "balanced": {"video_codec": "h264_nvenc", "preset": "medium", "crf": 20},
+                "quality": {"video_codec": "h264_nvenc", "preset": "slow", "crf": 18},
+            },
+            "intel": {
+                "fast": {"video_codec": "h264_qsv", "preset": "veryfast", "crf": 23},
+                "balanced": {"video_codec": "h264_qsv", "preset": "medium", "crf": 20},
+                "quality": {"video_codec": "h264_qsv", "preset": "slow", "crf": 18},
+            },
+            "amd": {
+                "fast": {"video_codec": "h264_amf", "preset": "speed", "crf": 23},
+                "balanced": {"video_codec": "h264_amf", "preset": "balanced", "crf": 20},
+                "quality": {"video_codec": "h264_amf", "preset": "quality", "crf": 18},
+            },
+        }
+        updates = (hardware_presets.get(selected_encoder, cpu_presets)).get(selected_preset, cpu_presets["balanced"])
+        return {**updates, "encoder": selected_encoder, "quality_preset": selected_preset}
 
     def _render_voiceover_output(
         self,
@@ -812,7 +846,7 @@ class VideoTranslationPipeline:
     def _read_transcript(self, context: JobContext) -> TranscriptDocument:
         if not context.transcript_json_path.exists():
             raise ProcessError(
-                "ChÆ°a cÃ³ báº£n nháº­n dáº¡ng giá»ng nÃ³i cho job nÃ y. HÃ£y cháº¡y xá»­ lÃ½ video xong trÆ°á»›c, rá»“i má»›i báº¥m Dá»‹ch láº¡i sang tiáº¿ng Viá»‡t."
+                "Chưa có bản nhận dạng giọng nói cho job này. Hãy chạy xử lý video xong trước, rồi mới bấm Dịch lại sang tiếng Việt."
             )
         return TranscriptDocument.model_validate_json(context.transcript_json_path.read_text(encoding="utf-8"))
 

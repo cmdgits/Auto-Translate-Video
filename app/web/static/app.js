@@ -87,6 +87,7 @@ const useTranslatedBtn = document.getElementById("useTranslatedBtn");
 const splitSegmentBtn = document.getElementById("splitSegmentBtn");
 const mergePreviousBtn = document.getElementById("mergePreviousBtn");
 const mergeNextBtn = document.getElementById("mergeNextBtn");
+const applySpeakerVoiceBtn = document.getElementById("applySpeakerVoiceBtn");
 const resumeJobsBtn = document.getElementById("resumeJobsBtn");
 const apiSettingsToggle = document.getElementById("apiSettingsToggle");
 const apiSettingsPanel = document.getElementById("apiSettingsPanel");
@@ -102,9 +103,14 @@ const toast = document.getElementById("toast");
 const voiceNameInput = document.getElementById("voiceNameInput");
 const voiceGainInput = document.getElementById("voiceGainInput");
 const bedGainInput = document.getElementById("bedGainInput");
+const renderEncoderSelect = document.getElementById("renderEncoderSelect");
+const renderPresetSelect = document.getElementById("renderPresetSelect");
+const renderPresetHint = document.getElementById("renderPresetHint");
 
 const MIN_SEGMENT_DURATION = 0.2;
 const DEFAULT_TIMELINE_PIXELS_PER_SECOND = 72;
+const DRAG_SNAP_SECONDS = 0.01;
+const AUTO_PREVIEW_SEGMENT_PADDING = 0.08;
 const MIN_VIDEO_ZOOM = 60;
 const MAX_VIDEO_ZOOM = 180;
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9;
@@ -113,6 +119,7 @@ const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
 const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
+const RENDER_SETTINGS_STORAGE_KEY = "autoTranslateVideo.renderSettings.v1";
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
 const EXTRA_SUBTITLE_TRACKS_STORAGE_PREFIX = "autoTranslateVideo.extraSubtitleTracks.v1";
@@ -147,6 +154,59 @@ const ERROR_TRANSLATIONS = [
   ["Could not resume jobs.", "Không thể chạy tiếp tác vụ."],
   ["Job failed", "Tác vụ thất bại"],
 ];
+
+const CP1252_BYTE_MAP = {
+  "€": 0x80,
+  "‚": 0x82,
+  "ƒ": 0x83,
+  "„": 0x84,
+  "…": 0x85,
+  "†": 0x86,
+  "‡": 0x87,
+  "ˆ": 0x88,
+  "‰": 0x89,
+  "Š": 0x8a,
+  "‹": 0x8b,
+  "Œ": 0x8c,
+  "Ž": 0x8e,
+  "‘": 0x91,
+  "’": 0x92,
+  "“": 0x93,
+  "”": 0x94,
+  "•": 0x95,
+  "–": 0x96,
+  "—": 0x97,
+  "˜": 0x98,
+  "™": 0x99,
+  "š": 0x9a,
+  "›": 0x9b,
+  "œ": 0x9c,
+  "ž": 0x9e,
+  "Ÿ": 0x9f,
+};
+
+function repairMojibakeText(value) {
+  const text = String(value || "");
+  if (!/(?:[\u00c3\u00c4\u00c6]|\u00e1[\u00ba\u00bb]|\u00f0\u0178)/u.test(text) || typeof TextDecoder === "undefined") {
+    return text;
+  }
+  const bytes = [];
+  for (const character of text) {
+    const code = character.charCodeAt(0);
+    if (code <= 0xff) {
+      bytes.push(code);
+    } else if (Object.prototype.hasOwnProperty.call(CP1252_BYTE_MAP, character)) {
+      bytes.push(CP1252_BYTE_MAP[character]);
+    } else {
+      return text;
+    }
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+  } catch (error) {
+    return text;
+  }
+}
 
 const STAGE_LABELS = {
   queued: "Đang chờ",
@@ -220,6 +280,10 @@ const state = {
     coverOpacity: 72,
     coverHeight: 18,
   },
+  renderSettings: {
+    encoder: "cpu",
+    preset: "balanced",
+  },
   previewMode: "source",
   previewSourceMode: "source",
   drag: null,
@@ -229,6 +293,7 @@ const state = {
   canvasResize: null,
   subtitleDrag: null,
   liveSegmentId: null,
+  segmentPreviewStopHandler: null,
   savePromptResolver: null,
   pendingExportSave: null,
 };
@@ -553,11 +618,66 @@ function snapTimelineTime(value) {
   if (Number.isFinite(playhead) && Math.abs(snapped - playhead) <= snapThreshold) {
     snapped = playhead;
   }
-  snapped = Math.round(snapped / 0.05) * 0.05;
+  snapped = Math.round(snapped / DRAG_SNAP_SECONDS) * DRAG_SNAP_SECONDS;
   if (duration > 0) {
     snapped = Math.max(0, Math.min(snapped, duration));
   }
   return Number(snapped.toFixed(3));
+}
+
+function segmentOverlapIds() {
+  const overlaps = new Set();
+  const segments = orderedSegments();
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const current = segments[index];
+    const next = segments[index + 1];
+    if (Number(current.end) > Number(next.start) + 0.002) {
+      overlaps.add(Number(current.id));
+      overlaps.add(Number(next.id));
+    }
+  }
+  return overlaps;
+}
+
+function subtitleTimingWarningText(overlapIds = segmentOverlapIds()) {
+  const invalidCount = orderedSegments().filter((segment) => Number(segment.end) <= Number(segment.start)).length;
+  const messages = [];
+  if (overlapIds.size) {
+    messages.push(`${overlapIds.size} đoạn chồng thời gian`);
+  }
+  if (invalidCount) {
+    messages.push(`${invalidCount} đoạn sai thời lượng`);
+  }
+  return messages.join(" | ");
+}
+
+function playSelectedSegmentPreview() {
+  const segment = getSelectedSegment();
+  if (!segment || !Number.isFinite(videoPreview.duration)) {
+    return;
+  }
+  if (state.segmentPreviewStopHandler) {
+    videoPreview.removeEventListener("timeupdate", state.segmentPreviewStopHandler);
+    state.segmentPreviewStopHandler = null;
+  }
+  const start = Math.max(0, Number(segment.start) + AUTO_PREVIEW_SEGMENT_PADDING);
+  const end = Math.max(start + 0.1, Number(segment.end) - AUTO_PREVIEW_SEGMENT_PADDING);
+  videoPreview.currentTime = start;
+  videoPreview.play().catch(() => {});
+
+  const stopAtSegmentEnd = () => {
+    if (state.selectedSegmentId !== Number(segment.id)) {
+      videoPreview.removeEventListener("timeupdate", stopAtSegmentEnd);
+      return;
+    }
+    if ((videoPreview.currentTime || 0) >= end) {
+      videoPreview.pause();
+      videoPreview.removeEventListener("timeupdate", stopAtSegmentEnd);
+      state.segmentPreviewStopHandler = null;
+    }
+  };
+  state.segmentPreviewStopHandler = stopAtSegmentEnd;
+  videoPreview.addEventListener("timeupdate", stopAtSegmentEnd);
 }
 
 function showSubtitleOverlayInCurrentMode() {
@@ -676,6 +796,71 @@ function subtitleStylePayload() {
     subtitle_cover_opacity: state.subtitleStyle.coverOpacity / 100,
     subtitle_cover_height_ratio: state.subtitleStyle.coverHeight / 100,
   };
+}
+
+function renderSettingsPayload() {
+  return {
+    render_encoder: state.renderSettings.encoder,
+    render_preset: state.renderSettings.preset,
+  };
+}
+
+function renderPayload(extra = {}) {
+  return {
+    ...subtitleStylePayload(),
+    ...renderSettingsPayload(),
+    ...extra,
+  };
+}
+
+function renderPresetHintText() {
+  const encoderLabels = {
+    cpu: "CPU",
+    nvidia: "NVIDIA GPU",
+    intel: "Intel GPU",
+    amd: "AMD GPU",
+  };
+  const presetLabels = {
+    fast: "nhanh hơn, file nhỏ hơn nhưng chất lượng giảm nhẹ",
+    balanced: "cân bằng tốc độ và chất lượng",
+    quality: "chất lượng cao, xuất lâu hơn và file lớn hơn",
+  };
+  return `${encoderLabels[state.renderSettings.encoder] || "CPU"}: ${presetLabels[state.renderSettings.preset] || presetLabels.balanced}.`;
+}
+
+function applyRenderSettings(nextSettings = {}) {
+  const encoder = ["cpu", "nvidia", "intel", "amd"].includes(nextSettings.encoder)
+    ? nextSettings.encoder
+    : state.renderSettings.encoder;
+  const preset = ["fast", "balanced", "quality"].includes(nextSettings.preset)
+    ? nextSettings.preset
+    : state.renderSettings.preset;
+  state.renderSettings = { encoder, preset };
+  if (renderEncoderSelect) {
+    renderEncoderSelect.value = encoder;
+  }
+  if (renderPresetSelect) {
+    renderPresetSelect.value = preset;
+  }
+  if (renderPresetHint) {
+    renderPresetHint.textContent = renderPresetHintText();
+  }
+}
+
+function persistRenderSettings() {
+  try {
+    window.localStorage.setItem(RENDER_SETTINGS_STORAGE_KEY, JSON.stringify(state.renderSettings));
+  } catch (error) {
+  }
+}
+
+function loadRenderSettings() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(RENDER_SETTINGS_STORAGE_KEY) || "{}");
+    applyRenderSettings(saved);
+  } catch (error) {
+    applyRenderSettings();
+  }
 }
 
 function extraSubtitleTracksStorageKey(jobId = state.jobId) {
@@ -1010,7 +1195,7 @@ function escapeHtml(value) {
 }
 
 function userMessage(message) {
-  let text = String(message || "Có lỗi xảy ra.");
+  let text = repairMojibakeText(message || "Có lỗi xảy ra.");
   ERROR_TRANSLATIONS.forEach(([source, target]) => {
     text = text.replaceAll(source, target);
   });
@@ -1086,6 +1271,12 @@ function appendApiSettings(payload) {
 
 function appendSubtitleStyle(payload) {
   Object.entries(subtitleStylePayload()).forEach(([key, value]) => {
+    payload.set(key, String(value));
+  });
+}
+
+function appendRenderSettings(payload) {
+  Object.entries(renderSettingsPayload()).forEach(([key, value]) => {
     payload.set(key, String(value));
   });
 }
@@ -1570,7 +1761,7 @@ function drawWaveform() {
     return;
   }
   const width = Math.max(1, Math.round(state.laneWidth || timelineTrack.clientWidth || 1));
-  const height = Math.max(58, Math.round(timelineWaveform.clientHeight || 68));
+  const height = Math.max(84, Math.round(timelineWaveform.clientHeight || 92));
   const pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   const canvasWidth = Math.round(width * pixelRatio);
   const canvasHeight = Math.round(height * pixelRatio);
@@ -1585,11 +1776,12 @@ function drawWaveform() {
   const context = timelineWaveform.getContext("2d");
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = "#f7fff9";
+  context.fillStyle = "#f0fdf4";
   context.fillRect(0, 0, width, height);
   const gradient = context.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(1, "#dcfce7");
+  gradient.addColorStop(0.56, "#ecfdf5");
+  gradient.addColorStop(1, "#bbf7d0");
   context.fillStyle = gradient;
   context.fillRect(0, 0, width, height);
   const peaks = state.waveform?.peaks || [];
@@ -1600,7 +1792,7 @@ function drawWaveform() {
     return;
   }
   const centerY = height / 2;
-  context.strokeStyle = "rgba(15, 23, 42, 0.10)";
+  context.strokeStyle = "rgba(15, 23, 42, 0.13)";
   context.lineWidth = 1;
   [0.25, 0.5, 0.75].forEach((ratio) => {
     const y = Math.round(height * ratio) + 0.5;
@@ -1609,7 +1801,7 @@ function drawWaveform() {
     context.lineTo(width, y);
     context.stroke();
   });
-  context.strokeStyle = "rgba(15, 23, 42, 0.22)";
+  context.strokeStyle = "rgba(15, 23, 42, 0.28)";
   context.lineWidth = 1;
   context.beginPath();
   context.moveTo(0, centerY);
@@ -1617,17 +1809,17 @@ function drawWaveform() {
   context.stroke();
   const maxPeak = Math.max(...peaks.map((peak) => Number(peak || 0)).filter(Number.isFinite), 0.01);
   const step = width / peaks.length;
-  const barWidth = Math.max(1, Math.min(3, step * 0.55));
+  const barWidth = Math.max(1.5, Math.min(4, step * 0.68));
   const waveformGradient = context.createLinearGradient(0, 0, 0, height);
-  waveformGradient.addColorStop(0, "#4ade80");
-  waveformGradient.addColorStop(0.5, "#22c55e");
-  waveformGradient.addColorStop(1, "#16a34a");
+  waveformGradient.addColorStop(0, "#86efac");
+  waveformGradient.addColorStop(0.45, "#16a34a");
+  waveformGradient.addColorStop(1, "#15803d");
   context.fillStyle = waveformGradient;
   peaks.forEach((peak, index) => {
     const x = Math.round(index * step - barWidth / 2);
     const normalizedPeak = Math.max(0, Math.min(1, Number(peak || 0) / maxPeak));
-    const boostedPeak = Math.pow(normalizedPeak, 0.72);
-    const amplitude = Math.max(1.5, boostedPeak * (height * 0.38));
+    const boostedPeak = Math.pow(normalizedPeak, 0.55);
+    const amplitude = Math.max(2.5, boostedPeak * (height * 0.46));
     context.fillRect(x, centerY - amplitude, barWidth, amplitude * 2);
   });
 }
@@ -1673,6 +1865,8 @@ function renderTimeline() {
   }
 
   const roundedDuration = Math.max(1, Math.ceil(duration));
+  const overlapIds = segmentOverlapIds();
+  const timingWarning = subtitleTimingWarningText(overlapIds);
   state.laneWidth = Math.max(timelineTrack.clientWidth || 0, roundedDuration * state.timelinePixelsPerSecond);
   timelineLane.style.width = `${state.laneWidth}px`;
   timelineRuler.style.width = `${state.laneWidth}px`;
@@ -1680,7 +1874,8 @@ function renderTimeline() {
     loadWaveform(state.job?.job_id);
   }
   drawWaveform();
-  timelineMeta.textContent = `${segments.length} đoạn | ${formatSeconds(duration)} | ${state.timelinePixelsPerSecond} px/s`;
+  timelineMeta.textContent = `${segments.length} đoạn | ${formatSeconds(duration)} | ${state.timelinePixelsPerSecond} px/s${timingWarning ? ` | ⚠ ${timingWarning}` : ""}`;
+  timelineMeta.classList.toggle("warn", Boolean(timingWarning));
 
   const minMarkerGap = 92;
   const markerStep = Math.max(1, Math.ceil(minMarkerGap / state.timelinePixelsPerSecond));
@@ -1711,6 +1906,10 @@ function renderTimeline() {
     }
     if (Number(segment.id) === Number(state.liveSegmentId)) {
       block.classList.add("live");
+    }
+    if (overlapIds.has(Number(segment.id))) {
+      block.classList.add("overlap");
+      block.title = "Đoạn này đang chồng thời gian với đoạn kế bên.";
     }
     block.innerHTML = `
       <span class="timeline-handle left" data-edge="left"></span>
@@ -1759,7 +1958,7 @@ function renderInspector() {
   [segmentStartInput, segmentEndInput, segmentSourceInput, segmentTranslatedInput, segmentSubtitleInput, segmentSpeakerInput, segmentVoiceNameSelect].forEach((input) => {
     input.disabled = disabled;
   });
-  [nudgeBackBtn, nudgeForwardBtn, useTranslatedBtn, splitSegmentBtn, mergePreviousBtn, mergeNextBtn].forEach((button) => {
+  [nudgeBackBtn, nudgeForwardBtn, useTranslatedBtn, splitSegmentBtn, mergePreviousBtn, mergeNextBtn, applySpeakerVoiceBtn].forEach((button) => {
     button.disabled = disabled;
   });
 
@@ -1790,6 +1989,9 @@ function renderInspector() {
   segmentSubtitleInput.value = segmentSubtitleText(segment);
   segmentSpeakerInput.value = segment.speaker || "";
   segmentVoiceNameSelect.value = segment.voice_name || "";
+  if (applySpeakerVoiceBtn) {
+    applySpeakerVoiceBtn.disabled = disabled || !String(segment.speaker || "").trim() || !String(segment.voice_name || "").trim();
+  }
 }
 
 function renderAll() {
@@ -1834,15 +2036,15 @@ function segmentContainingTime(time) {
   ) || null;
 }
 
-function selectSegmentAtTime(time, focusEditor = false) {
+function selectSegmentAtTime(time, focusEditor = false, autoPlay = false) {
   const segment = segmentContainingTime(time);
   if (segment) {
-    selectSegment(Number(segment.id), false, focusEditor);
+    selectSegment(Number(segment.id), false, focusEditor, autoPlay);
   }
   seekVideoToTime(time);
 }
 
-function selectSegment(segmentId, seekVideo = false, focusEditor = false) {
+function selectSegment(segmentId, seekVideo = false, focusEditor = false, autoPlay = false) {
   if (!getSegmentById(segmentId)) {
     return;
   }
@@ -1862,6 +2064,9 @@ function selectSegment(segmentId, seekVideo = false, focusEditor = false) {
   }
   if (focusEditor) {
     focusSubtitleEditor();
+  }
+  if (autoPlay) {
+    playSelectedSegmentPreview();
   }
 }
 
@@ -1958,7 +2163,7 @@ function applyJobState(job) {
   }
 
   if (job.status === "completed_with_errors") {
-    const message = job.errors?.[0] || "Xuất video hoàn tất nhưng có cảnh báo";
+    const message = userMessage(job.errors?.[0] || "Xuất video hoàn tất nhưng có cảnh báo");
     if (state.pendingExportSave?.jobId === job.job_id) {
       const pendingExport = state.pendingExportSave;
       state.pendingExportSave = null;
@@ -1983,7 +2188,7 @@ function applyJobState(job) {
 
   if (job.status === "cancelled") {
     state.pendingExportSave = null;
-    setStatus(job.errors?.[0] || "Đã dừng tác vụ", "warn");
+    setStatus(userMessage(job.errors?.[0] || "Đã dừng tác vụ"), "warn");
     stopPolling();
     pollJobs();
   }
@@ -2221,12 +2426,11 @@ async function runRenderWithDestination(endpoint, artifact, body = null) {
 }
 
 function voiceoverRenderPayload() {
-  return {
-    ...subtitleStylePayload(),
+  return renderPayload({
     voice_name: voiceNameInput.value || null,
     voiceover_gain: parseNumberOrCurrent(voiceGainInput.value, null),
     background_audio_gain: parseNumberOrCurrent(bedGainInput.value, null),
-  };
+  });
 }
 
 async function renderHardsubFromCurrentSubtitles() {
@@ -2237,7 +2441,7 @@ async function renderHardsubFromCurrentSubtitles() {
   await runRenderWithDestination(
     `/api/jobs/${state.jobId}/render/hardsub`,
     "video_hardsub",
-    subtitleStylePayload(),
+    renderPayload(),
   );
 }
 
@@ -2267,10 +2471,9 @@ async function renderSoftsubFromCurrentSubtitles() {
   await runRenderWithDestination(
     `/api/jobs/${state.jobId}/render/softsub`,
     "video_softsub",
-    {
-      ...subtitleStylePayload(),
+    renderPayload({
       extra_subtitle_tracks: extraSubtitleTracksPayload(),
-    },
+    }),
   );
 }
 
@@ -2730,6 +2933,7 @@ form.addEventListener("submit", async (event) => {
   const payload = new FormData(form);
   appendApiSettings(payload);
   appendSubtitleStyle(payload);
+  appendRenderSettings(payload);
   const endpoint = files.length === 1 ? "/api/jobs" : "/api/jobs/batch";
   if (files.length > 1) {
     payload.delete("file");
@@ -2899,7 +3103,7 @@ if (burnSubtitleBtn) {
       await runRenderWithDestination(
         `/api/jobs/${state.jobId}/render/hardsub`,
         "video_hardsub",
-        subtitleStylePayload(),
+        renderPayload(),
       );
     } catch (error) {
       setStatus(userMessage(error.message), "error");
@@ -2922,6 +3126,20 @@ if (voiceoverRenderBtn) {
     } catch (error) {
       setStatus(userMessage(error.message), "error");
     }
+  });
+}
+
+if (renderEncoderSelect) {
+  renderEncoderSelect.addEventListener("change", () => {
+    applyRenderSettings({ encoder: renderEncoderSelect.value, preset: state.renderSettings.preset });
+    persistRenderSettings();
+  });
+}
+
+if (renderPresetSelect) {
+  renderPresetSelect.addEventListener("change", () => {
+    applyRenderSettings({ encoder: state.renderSettings.encoder, preset: renderPresetSelect.value });
+    persistRenderSettings();
   });
 }
 
@@ -2989,6 +3207,28 @@ segmentVoiceNameSelect.addEventListener("change", () => {
   updateSelectedTextField("voice_name", segmentVoiceNameSelect.value);
 });
 
+if (applySpeakerVoiceBtn) {
+  applySpeakerVoiceBtn.addEventListener("click", () => {
+    const segment = getSelectedSegment();
+    const speaker = String(segment?.speaker || "").trim();
+    const voiceName = String(segment?.voice_name || "").trim();
+    if (!speaker || !voiceName) {
+      setStatus("Hãy nhập speaker và chọn giọng trước khi áp dụng.", "warn");
+      return;
+    }
+    let changed = 0;
+    state.segments.forEach((candidate) => {
+      if (String(candidate.speaker || "").trim() === speaker && candidate.voice_name !== voiceName) {
+        candidate.voice_name = voiceName;
+        changed += 1;
+      }
+    });
+    setDirty(true);
+    renderAll();
+    setStatus(`Đã áp dụng giọng ${voiceName} cho ${changed || 1} đoạn speaker ${speaker}.`, "ok");
+  });
+}
+
 nudgeBackBtn.addEventListener("click", () => {
   updateSelectedSegment((segment) => {
     segment.start -= 0.1;
@@ -3026,7 +3266,7 @@ timelineLane.addEventListener("click", (event) => {
   if (!block) {
     const clickedTime = timelineTimeFromPointer(event);
     if (clickedTime !== null) {
-      selectSegmentAtTime(clickedTime, true);
+      selectSegmentAtTime(clickedTime, true, true);
     }
     return;
   }
@@ -3055,11 +3295,7 @@ timelineLane.addEventListener("mousedown", (event) => {
     initialStart: Number(segment.start),
     initialEnd: Number(segment.end),
   };
-  selectSegment(Number(block.dataset.id), false);
-  if (mode === "move") {
-    seekVideoToTime(segment.start);
-    focusSubtitleEditor();
-  }
+  selectSegment(Number(block.dataset.id), false, mode === "move", mode === "move");
   document.body.classList.add("dragging");
 });
 
@@ -3136,10 +3372,10 @@ document.addEventListener("mouseup", () => {
   state.drag = null;
   document.body.classList.remove("dragging");
   renderAll();
-  if (finishedDrag.mode === "move") {
+  if (finishedDrag.mode === "move" || finishedDrag.mode === "resize-left" || finishedDrag.mode === "resize-right") {
     const segment = getSegmentById(finishedDrag.id);
     if (segment) {
-      seekVideoToTime(segment.start);
+      playSelectedSegmentPreview();
     }
   }
 });
@@ -3149,7 +3385,7 @@ scriptList.addEventListener("click", (event) => {
   if (!item) {
     return;
   }
-  selectSegment(Number(item.dataset.id), true, true);
+  selectSegment(Number(item.dataset.id), false, true, true);
 });
 
 jobList.addEventListener("click", async (event) => {
@@ -3223,6 +3459,7 @@ clearSelectedJob();
 loadMediaPanelState();
 applyVideoZoom();
 loadSubtitleStyle();
+loadRenderSettings();
 applyTimelineZoom(DEFAULT_TIMELINE_PIXELS_PER_SECOND, false);
 loadApiSettings();
 pollJobs();

@@ -142,6 +142,8 @@ http://127.0.0.1:8001
 - Xuất video phụ đề để tạo file `.mp4` có phụ đề tiếng Việt được gắn vào video.
 - Xuất video softsub để tạo file `.mkv` chứa nhiều track phụ đề mềm, gồm phụ đề gốc và phụ đề tiếng Việt.
 - Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
+- Trong mục Xuất video, có thể chọn bộ mã hoá `CPU`, `NVIDIA GPU`, `Intel GPU`, `AMD GPU` và preset `Nhanh`, `Cân bằng`, `Chất lượng cao`.
+- Nếu chọn GPU nhưng máy không có driver/phần cứng tương ứng, FFmpeg sẽ báo lỗi; hãy chuyển về `CPU - ổn định`.
 - Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
 
 ## Chạy Worker Riêng
@@ -362,8 +364,33 @@ app/
 config.example.yaml  File cấu hình mẫu
 run_web.bat          File chạy nhanh web UI trên Windows
 run_web.ps1          File chạy web UI bằng PowerShell
+build_exe.bat        File đóng gói bản chạy AutoTranslateVideo.exe
 workspace_data/      Dữ liệu upload, tác vụ và kết quả render
 ```
+
+## Đóng Gói Thành File EXE
+
+Dự án có sẵn cấu hình PyInstaller để đóng gói web UI thành bản chạy trên Windows.
+
+1. Cài PyInstaller nếu máy chưa có:
+
+```powershell
+tools\Python312\python.exe -m pip install pyinstaller
+```
+
+2. Chạy file đóng gói:
+
+```powershell
+.\build_exe.bat
+```
+
+3. Sau khi hoàn tất, mở file:
+
+```text
+dist\AutoTranslateVideo\AutoTranslateVideo.exe
+```
+
+File EXE sẽ tự mở web UI tại `http://127.0.0.1:8001/`. Nếu có `tools\ffmpeg\bin\ffmpeg.exe` và `ffprobe.exe`, script sẽ đưa FFmpeg vào gói chạy để máy khác dùng thuận tiện hơn.
 
 ## Lưu Ý Khi Đưa Lên GitHub
 

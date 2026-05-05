@@ -56,6 +56,22 @@ def build_hardsub_filter(subtitle_path: Path, render_config: RenderConfig) -> st
     return f"{cover_filter},{subtitle_filter}"
 
 
+def video_encode_args(render_config: RenderConfig) -> list[str]:
+    codec = str(render_config.video_codec or "libx264").strip().lower()
+    preset = str(render_config.preset or "medium").strip()
+    quality = str(render_config.crf)
+    args = ["-c:v", codec]
+    if codec in {"libx264", "libx265"}:
+        return [*args, "-preset", preset, "-crf", quality]
+    if codec == "h264_nvenc":
+        return [*args, "-preset", preset, "-rc", "vbr", "-cq", quality, "-b:v", "0"]
+    if codec == "h264_qsv":
+        return [*args, "-preset", preset, "-global_quality", quality]
+    if codec == "h264_amf":
+        return [*args, "-quality", preset, "-rc", "cqp", "-qp_i", quality, "-qp_p", quality, "-qp_b", quality]
+    return [*args, "-preset", preset]
+
+
 def burn_subtitles_into_video(
     input_video: Path,
     subtitle_path: Path,
@@ -79,12 +95,7 @@ def burn_subtitles_into_video(
         "[v]",
         "-map",
         "0:a?",
-        "-c:v",
-        render_config.video_codec,
-        "-preset",
-        render_config.preset,
-        "-crf",
-        str(render_config.crf),
+        *video_encode_args(render_config),
         "-c:a",
         render_config.audio_codec,
         "-b:a",
@@ -119,15 +130,9 @@ def render_video_with_replaced_audio(
         "-map",
         "1:a:0",
         "-c:v",
-        render_config.video_codec,
-        "-preset",
-        render_config.preset,
-        "-crf",
-        str(render_config.crf),
+        "copy",
         "-c:a",
-        render_config.audio_codec,
-        "-b:a",
-        render_config.audio_bitrate,
+        "copy",
         "-shortest",
         "-movflags",
         "+faststart",
@@ -164,12 +169,7 @@ def mux_subtitle_tracks_into_video(
         command.extend(["-map", f"{index + 1}:0"])
     if cover_filter:
         command.extend([
-            "-c:v",
-            render_config.video_codec,
-            "-preset",
-            render_config.preset,
-            "-crf",
-            str(render_config.crf),
+            *video_encode_args(render_config),
             "-c:a",
             "copy",
             "-c:s",
@@ -212,12 +212,7 @@ def build_mux_subtitle_tracks_command_string(
         command.extend(["-map", f"{index + 1}:0"])
     if cover_filter:
         command.extend([
-            "-c:v",
-            render_config.video_codec,
-            "-preset",
-            render_config.preset,
-            "-crf",
-            str(render_config.crf),
+            *video_encode_args(render_config),
             "-c:a",
             "copy",
             "-c:s",
