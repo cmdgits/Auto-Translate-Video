@@ -1582,16 +1582,13 @@ function availableCanvasSize() {
 function applyVideoZoom(value = state.videoZoom) {
   const nextZoom = Math.max(MIN_VIDEO_ZOOM, Math.min(MAX_VIDEO_ZOOM, Number(value) || 100));
   const { width: availableWidth, height: availableHeight } = availableCanvasSize();
-  const aspectRatio = currentVideoAspectRatio();
-  const fitWidth = Math.min(1090, availableWidth);
-  const fitHeight = Math.min(availableHeight, fitWidth / aspectRatio);
   const zoomScale = nextZoom / 100;
-  const targetWidth = Math.min(availableWidth, fitHeight * aspectRatio * zoomScale);
-  const targetHeight = Math.min(availableHeight, targetWidth / aspectRatio);
+  const targetWidth = Math.min(availableWidth, availableWidth * zoomScale);
+  const targetHeight = Math.min(availableHeight, availableHeight * zoomScale);
   state.videoZoom = nextZoom;
   canvasFrame.style.width = `${Math.round(targetWidth)}px`;
   canvasFrame.style.height = `${Math.round(targetHeight)}px`;
-  canvasFrame.style.aspectRatio = `${aspectRatio}`;
+  canvasFrame.style.aspectRatio = "auto";
   if (videoZoomRange) {
     videoZoomRange.value = String(nextZoom);
   }

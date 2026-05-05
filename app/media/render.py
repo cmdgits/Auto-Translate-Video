@@ -36,10 +36,15 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
     if cover_mode in {"blur", "none", "off", "disabled"}:
         return ""
 
+    blur_radius = max(3, min(30, int(round(cover_opacity * 22))))
+    blur_power = max(1, min(4, int(round(cover_opacity * 3))))
     return (
-        f"drawbox=x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f}:"
-        f"w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:"
-        f"color=black@{cover_opacity:.3f}:t=fill"
+        f"split[base][blur_src];"
+        f"[blur_src]crop=w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:"
+        f"x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f},"
+        f"boxblur=luma_radius={blur_radius}:luma_power={blur_power}:"
+        f"chroma_radius={blur_radius}:chroma_power={blur_power}[blur_roi];"
+        f"[base][blur_roi]overlay=x=W*{cover_left_ratio:.3f}:y=H*{cover_top:.3f}"
     )
 
 
