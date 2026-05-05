@@ -51,6 +51,10 @@ render:
   subtitle_cover_position_x: 50
   subtitle_cover_position_y: 8
   subtitle_cover_opacity: 0.9
+  subtitle_font_size: 32
+  subtitle_box_width_ratio: 0.84
+  subtitle_position_x: 50
+  subtitle_position_y: 8
 tts:
   backend: edge-tts
   voice: vi-VN-HoaiMyNeural

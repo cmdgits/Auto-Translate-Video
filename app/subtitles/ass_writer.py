@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from pathlib import Path
 
 from app.models import TranscriptDocument
@@ -28,12 +29,71 @@ def escape_ass_text(value: str) -> str:
     )
 
 
+def wrap_ass_text(value: str, font_size: int, box_width_ratio: float) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+
+    safe_box_width = max(0.1, min(1.0, float(box_width_ratio)))
+    approx_chars_per_line = max(8, min(120, int((PLAY_RES_X * safe_box_width) / max(font_size * 0.58, 1))))
+    wrapped_lines: list[str] = []
+    for manual_line in text.split("\n"):
+        line = manual_line.strip()
+        if not line:
+            continue
+        wrapped = textwrap.wrap(
+            line,
+            width=approx_chars_per_line,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        wrapped_lines.extend(wrapped or [line])
+    return "\n".join(wrapped_lines)
+
+
+def compact_text(value: str | None) -> str:
+    return " ".join(str(value or "").split())
+
+
+def auto_wrapped_text(value: str, max_chars_per_line: int, max_lines: int) -> str:
+    wrapped = textwrap.wrap(
+        value.strip(),
+        width=max(8, int(max_chars_per_line)),
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+    if not wrapped:
+        return value.strip()
+    if len(wrapped) > max_lines:
+        first_lines = wrapped[: max_lines - 1]
+        last_line = " ".join(wrapped[max_lines - 1 :])
+        wrapped = [*first_lines, last_line]
+    return "\n".join(wrapped)
+
+
+def render_text_for_segment(segment, auto_wrap_chars_per_line: int, auto_wrap_max_lines: int) -> str:
+    subtitle_text = str(segment.subtitle_text or "").strip()
+    translated_text = str(segment.translated_text or "").strip()
+    source_text = str(segment.text or "").strip()
+    if (
+        subtitle_text
+        and translated_text
+        and compact_text(subtitle_text) == compact_text(translated_text)
+        and subtitle_text == auto_wrapped_text(translated_text, auto_wrap_chars_per_line, auto_wrap_max_lines)
+    ):
+        return translated_text
+    return subtitle_text or translated_text or source_text
+
+
 def write_ass(
     document: TranscriptDocument,
     output_path: Path,
     font_size: float = 32,
+    box_width_ratio: float = 0.84,
     position_x_percent: float = 50,
     bottom_percent: float = 8,
+    auto_wrap_chars_per_line: int = 42,
+    auto_wrap_max_lines: int = 2,
 ) -> Path:
     safe_font_size = max(8, min(64, int(round(font_size))))
     safe_x = max(0.0, min(100.0, float(position_x_percent)))
@@ -60,7 +120,13 @@ def write_ass(
     ]
 
     for segment in document.segments:
-        subtitle_text = escape_ass_text(segment.subtitle_text or segment.translated_text or segment.text)
+        subtitle_text = escape_ass_text(
+            wrap_ass_text(
+                render_text_for_segment(segment, auto_wrap_chars_per_line, auto_wrap_max_lines),
+                safe_font_size,
+                box_width_ratio,
+            )
+        )
         if not subtitle_text:
             continue
         lines.append(

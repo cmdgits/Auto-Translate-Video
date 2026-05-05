@@ -163,7 +163,7 @@ http://127.0.0.1:8001
 
 - Chọn chế độ xem phụ đề để kiểm tra chữ hiển thị trên video.
 - Dùng cụm nút dưới khung video để lùi 5 giây, phát/tạm dừng hoặc tiến 5 giây; khung xem trước không hiện thanh điều khiển mặc định của trình duyệt.
-- Tùy chỉnh cỡ chữ và đặt phụ đề ở bất kỳ vị trí nào trong khung video.
+- Tùy chỉnh cỡ chữ, độ rộng dòng chữ và đặt phụ đề ở bất kỳ vị trí nào trong khung video; có thể kéo rộng để chữ nằm ngang dài hơn hoặc thu hẹp để tự xuống dòng.
 - Tùy chỉnh vùng làm mờ che chữ gốc riêng biệt với phụ đề: ngang, dọc, chiều cao, chiều rộng và mức mờ đều chỉnh độc lập.
 - Nếu video có chữ gốc, có thể dùng chế độ làm mờ vùng chữ cũ thay vì phủ màu cứng.
 - Khi phóng to hoặc thu nhỏ video, phụ đề sẽ co giãn theo khung video để dễ canh chỉnh.
@@ -384,7 +384,7 @@ python -m app.main process --input "C:\videos\sample.mp4" --hardsub
 Ví dụ đặt phụ đề và vùng mờ che chữ gốc độc lập khi render:
 
 ```powershell
-python -m app.main process --input "C:\videos\sample.mp4" --hardsub --subtitle-position-x 50 --subtitle-position-y 8 --subtitle-cover-position-x 50 --subtitle-cover-position-y 8 --subtitle-cover-width-ratio 0.86 --subtitle-cover-height-ratio 0.07
+python -m app.main process --input "C:\videos\sample.mp4" --hardsub --subtitle-position-x 50 --subtitle-position-y 8 --subtitle-box-width-ratio 0.84 --subtitle-cover-position-x 50 --subtitle-cover-position-y 8 --subtitle-cover-width-ratio 0.86 --subtitle-cover-height-ratio 0.07
 ```
 
 Xử lý video và xuất luôn video thuyết minh:

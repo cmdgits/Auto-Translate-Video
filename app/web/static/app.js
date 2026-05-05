@@ -25,6 +25,8 @@ const videoPlayPauseBtn = document.getElementById("videoPlayPauseBtn");
 const videoForwardBtn = document.getElementById("videoForwardBtn");
 const subtitleSizeRange = document.getElementById("subtitleSizeRange");
 const subtitleSizeValue = document.getElementById("subtitleSizeValue");
+const subtitleBoxWidthRange = document.getElementById("subtitleBoxWidthRange");
+const subtitleBoxWidthValue = document.getElementById("subtitleBoxWidthValue");
 const subtitleXRange = document.getElementById("subtitleXRange");
 const subtitleXValue = document.getElementById("subtitleXValue");
 const subtitleYRange = document.getElementById("subtitleYRange");
@@ -280,6 +282,7 @@ const state = {
   videoZoom: 100,
   subtitleStyle: {
     size: 32,
+    boxWidth: 84,
     x: 50,
     y: 8,
     coverMode: "box",
@@ -789,6 +792,7 @@ function applySubtitleStyle(nextStyle = {}) {
   }
   state.subtitleStyle = {
     size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 64, 32),
+    boxWidth: clampNumber(nextStyle.boxWidth ?? state.subtitleStyle.boxWidth, 10, 100, 84),
     x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 0, 100, 50),
     y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 0, 100, 8),
     coverMode: coverMode || "box",
@@ -804,7 +808,7 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleOverlay.style.bottom = `${state.subtitleStyle.y}%`;
   subtitleOverlay.style.transform = "translateX(-50%)";
   subtitleOverlay.style.width = "max-content";
-  subtitleOverlay.style.maxWidth = "84%";
+  subtitleOverlay.style.maxWidth = `${state.subtitleStyle.boxWidth}%`;
   const compactCoverWidth = state.subtitleStyle.coverWidth;
   const coverLeft = (100 - compactCoverWidth) * (state.subtitleStyle.coverX / 100);
   const coverBottom = (100 - state.subtitleStyle.coverHeight) * (state.subtitleStyle.coverY / 100);
@@ -826,6 +830,7 @@ function applySubtitleStyle(nextStyle = {}) {
   document.body.classList.toggle("cover-mode-box", state.subtitleStyle.coverMode === "box");
 
   subtitleSizeRange.value = String(state.subtitleStyle.size);
+  subtitleBoxWidthRange.value = String(state.subtitleStyle.boxWidth);
   subtitleXRange.value = String(state.subtitleStyle.x);
   subtitleYRange.value = String(state.subtitleStyle.y);
   subtitleCoverModeSelect.value = state.subtitleStyle.coverMode;
@@ -835,6 +840,7 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleCoverHeightRange.value = String(state.subtitleStyle.coverHeight);
   subtitleCoverWidthRange.value = String(state.subtitleStyle.coverWidth);
   subtitleSizeValue.textContent = `${Math.round(state.subtitleStyle.size)}px`;
+  subtitleBoxWidthValue.textContent = `${Math.round(state.subtitleStyle.boxWidth)}%`;
   subtitleXValue.textContent = `${Math.round(state.subtitleStyle.x)}%`;
   subtitleYValue.textContent = `${Math.round(state.subtitleStyle.y)}%`;
   subtitleCoverValue.textContent = `${Math.round(state.subtitleStyle.coverOpacity)}%`;
@@ -856,6 +862,7 @@ function loadSubtitleStyle() {
 function subtitleStylePayload() {
   return {
     subtitle_font_size: state.subtitleStyle.size,
+    subtitle_box_width_ratio: state.subtitleStyle.boxWidth / 100,
     subtitle_position_x: state.subtitleStyle.x,
     subtitle_position_y: state.subtitleStyle.y,
     subtitle_cover_mode: state.subtitleStyle.coverMode,
@@ -1579,6 +1586,16 @@ function compactText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function displaySubtitleText(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
+}
+
 function sameCompactText(first, second) {
   const firstText = compactText(first);
   const secondText = compactText(second);
@@ -1590,9 +1607,9 @@ function segmentSubtitleText(segment) {
   const translatedText = compactText(segment?.translated_text);
   const subtitleText = compactText(segment?.subtitle_text);
   if (translatedText && translatedText !== sourceText && (!subtitleText || sameCompactText(subtitleText, sourceText))) {
-    return translatedText;
+    return displaySubtitleText(segment?.translated_text);
   }
-  return subtitleText || translatedText || sourceText;
+  return displaySubtitleText(segment?.subtitle_text || segment?.translated_text || segment?.text);
 }
 
 function setPreviewButtons() {
@@ -2900,6 +2917,12 @@ if (mediaPanelToggle && appShell) {
 
 subtitleSizeRange.addEventListener("input", () => {
   applySubtitleStyle({ size: subtitleSizeRange.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleBoxWidthRange.addEventListener("input", () => {
+  applySubtitleStyle({ boxWidth: subtitleBoxWidthRange.value });
   persistSubtitleStyle();
   setPreviewButtons();
 });

@@ -49,6 +49,7 @@ def process(
     voiceover_gain: float | None = typer.Option(None, help="Muc am luong kenh voice-over."),
     background_audio_gain: float | None = typer.Option(None, help="Muc am luong kenh audio goc khi mix voice-over."),
     subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_box_width_ratio: float | None = typer.Option(None, help="Do rong dong phu de, 0.1-1.0."),
     subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
     subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),
     subtitle_cover_mode: str | None = typer.Option(None, help="Che chu goc: none hoac box."),
@@ -83,6 +84,7 @@ def process(
         voiceover_gain=voiceover_gain,
         background_audio_gain=background_audio_gain,
         subtitle_font_size=subtitle_font_size,
+        subtitle_box_width_ratio=subtitle_box_width_ratio,
         subtitle_position_x=subtitle_position_x,
         subtitle_position_y=subtitle_position_y,
         subtitle_cover_mode=subtitle_cover_mode,
@@ -127,6 +129,7 @@ def render_hardsub(
     job_id: str = typer.Option(..., help="Job ID da co transcript/subtitle."),
     config: Path | None = typer.Option(None, help="Duong dan config YAML."),
     subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_box_width_ratio: float | None = typer.Option(None, help="Do rong dong phu de, 0.1-1.0."),
     subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
     subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),
     subtitle_cover_mode: str | None = typer.Option(None, help="Che chu goc: none hoac box."),
@@ -140,6 +143,7 @@ def render_hardsub(
     pipeline = _load_pipeline(config)
     options = PipelineRunOptions(
         subtitle_font_size=subtitle_font_size,
+        subtitle_box_width_ratio=subtitle_box_width_ratio,
         subtitle_position_x=subtitle_position_x,
         subtitle_position_y=subtitle_position_y,
         subtitle_cover_mode=subtitle_cover_mode,

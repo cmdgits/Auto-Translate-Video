@@ -643,8 +643,11 @@ class VideoTranslationPipeline:
             transcript,
             context.ass_path,
             font_size=subtitle_render_config.subtitle_font_size,
+            box_width_ratio=subtitle_render_config.subtitle_box_width_ratio,
             position_x_percent=subtitle_render_config.subtitle_position_x,
             bottom_percent=subtitle_render_config.subtitle_position_y,
+            auto_wrap_chars_per_line=self.config.subtitles.max_chars_per_line,
+            auto_wrap_max_lines=self.config.subtitles.max_lines,
         )
         duration_sec = self._duration_for_context(context)
         return self._run_video_render_with_auto_encoder(
@@ -766,6 +769,8 @@ class VideoTranslationPipeline:
             updates["subtitle_cover_position_y"] = max(0.0, min(100.0, float(options.subtitle_cover_position_y)))
         if options.subtitle_font_size is not None:
             updates["subtitle_font_size"] = max(8.0, min(64.0, float(options.subtitle_font_size)))
+        if options.subtitle_box_width_ratio is not None:
+            updates["subtitle_box_width_ratio"] = max(0.1, min(1.0, float(options.subtitle_box_width_ratio)))
         if options.subtitle_position_x is not None:
             updates["subtitle_position_x"] = max(0.0, min(100.0, float(options.subtitle_position_x)))
         if options.subtitle_position_y is not None:
