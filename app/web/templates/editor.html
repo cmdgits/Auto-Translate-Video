@@ -119,7 +119,7 @@
             </label>
             <label class="field two-col">
               <span>Gemini model</span>
-              <input name="gemini_model" type="text" value="gemini-2.5-flash" placeholder="gemini-2.5-flash" />
+              <input name="gemini_model" type="text" value="gemini-2.5-flash-lite" placeholder="gemini-2.5-flash-lite" />
             </label>
             <label class="field two-col">
               <span>Gemini base URL</span>
@@ -197,12 +197,12 @@
                 </label>
                 <label class="zoom-control subtitle-style-control">
                   <span>Ngang</span>
-                  <input id="subtitleXRange" type="range" min="10" max="90" step="1" value="50" />
+                  <input id="subtitleXRange" type="range" min="0" max="100" step="1" value="50" />
                   <output id="subtitleXValue">50%</output>
                 </label>
                 <label class="zoom-control subtitle-style-control">
                   <span>Cao</span>
-                  <input id="subtitleYRange" type="range" min="3" max="45" step="1" value="8" />
+                  <input id="subtitleYRange" type="range" min="0" max="100" step="1" value="8" />
                   <output id="subtitleYValue">8%</output>
                 </label>
               </div>
@@ -221,13 +221,23 @@
                   <output id="subtitleCoverValue">72%</output>
                 </label>
                 <label class="zoom-control subtitle-style-control cover-box-control">
+                  <span>Ngang vùng</span>
+                  <input id="subtitleCoverXRange" type="range" min="0" max="100" step="1" value="50" />
+                  <output id="subtitleCoverXValue">50%</output>
+                </label>
+                <label class="zoom-control subtitle-style-control cover-box-control">
+                  <span>Dọc vùng</span>
+                  <input id="subtitleCoverYRange" type="range" min="0" max="100" step="1" value="8" />
+                  <output id="subtitleCoverYValue">8%</output>
+                </label>
+                <label class="zoom-control subtitle-style-control cover-box-control">
                   <span>Cao vùng</span>
-                  <input id="subtitleCoverHeightRange" type="range" min="3" max="16" step="1" value="7" />
+                  <input id="subtitleCoverHeightRange" type="range" min="1" max="100" step="1" value="7" />
                   <output id="subtitleCoverHeightValue">7%</output>
                 </label>
                 <label class="zoom-control subtitle-style-control cover-box-control">
                   <span>Rộng vùng</span>
-                  <input id="subtitleCoverWidthRange" type="range" min="28" max="96" step="1" value="86" />
+                  <input id="subtitleCoverWidthRange" type="range" min="1" max="100" step="1" value="86" />
                   <output id="subtitleCoverWidthValue">86%</output>
                 </label>
               </div>

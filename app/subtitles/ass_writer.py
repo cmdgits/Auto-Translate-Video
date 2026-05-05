@@ -36,8 +36,8 @@ def write_ass(
     bottom_percent: float = 8,
 ) -> Path:
     safe_font_size = max(8, min(64, int(round(font_size))))
-    safe_x = max(10.0, min(90.0, float(position_x_percent)))
-    safe_bottom = max(3.0, min(45.0, float(bottom_percent)))
+    safe_x = max(0.0, min(100.0, float(position_x_percent)))
+    safe_bottom = max(0.0, min(100.0, float(bottom_percent)))
     position_x = round(PLAY_RES_X * safe_x / 100)
     position_y = round(PLAY_RES_Y * (1 - safe_bottom / 100))
 

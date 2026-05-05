@@ -14,7 +14,7 @@ from app.translate.retry import post_with_retry
 
 
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 
 def normalize_gemini_model(model: str | None) -> str:

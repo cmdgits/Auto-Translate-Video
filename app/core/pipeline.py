@@ -637,19 +637,15 @@ class VideoTranslationPipeline:
     ) -> Path:
         if not context.srt_path.exists():
             raise ProcessError("Chua co file SRT de burn subtitle.")
-        subtitle_path = context.srt_path
-        if options and any(
-            value is not None
-            for value in (options.subtitle_font_size, options.subtitle_position_x, options.subtitle_position_y)
-        ):
-            transcript = self._read_transcript(context)
-            subtitle_path = write_ass(
-                transcript,
-                context.ass_path,
-                font_size=options.subtitle_font_size or 32,
-                position_x_percent=options.subtitle_position_x or 50,
-                bottom_percent=options.subtitle_position_y or 8,
-            )
+        subtitle_render_config = self._render_config_for_options(options)
+        transcript = self._read_transcript(context)
+        subtitle_path = write_ass(
+            transcript,
+            context.ass_path,
+            font_size=subtitle_render_config.subtitle_font_size,
+            position_x_percent=subtitle_render_config.subtitle_position_x,
+            bottom_percent=subtitle_render_config.subtitle_position_y,
+        )
         duration_sec = self._duration_for_context(context)
         return self._run_video_render_with_auto_encoder(
             lambda render_config: burn_subtitles_into_video(
@@ -761,15 +757,19 @@ class VideoTranslationPipeline:
             updates["cover_original_subtitles"] = options.subtitle_cover_opacity > 0
             updates["subtitle_cover_opacity"] = max(0.0, min(1.0, float(options.subtitle_cover_opacity)))
         if options.subtitle_cover_height_ratio is not None:
-            updates["subtitle_cover_height_ratio"] = max(0.03, min(0.16, float(options.subtitle_cover_height_ratio)))
+            updates["subtitle_cover_height_ratio"] = max(0.01, min(1.0, float(options.subtitle_cover_height_ratio)))
         if options.subtitle_cover_width_ratio is not None:
-            updates["subtitle_cover_width_ratio"] = max(0.28, min(0.96, float(options.subtitle_cover_width_ratio)))
+            updates["subtitle_cover_width_ratio"] = max(0.01, min(1.0, float(options.subtitle_cover_width_ratio)))
+        if options.subtitle_cover_position_x is not None:
+            updates["subtitle_cover_position_x"] = max(0.0, min(100.0, float(options.subtitle_cover_position_x)))
+        if options.subtitle_cover_position_y is not None:
+            updates["subtitle_cover_position_y"] = max(0.0, min(100.0, float(options.subtitle_cover_position_y)))
         if options.subtitle_font_size is not None:
             updates["subtitle_font_size"] = max(8.0, min(64.0, float(options.subtitle_font_size)))
         if options.subtitle_position_x is not None:
-            updates["subtitle_position_x"] = max(10.0, min(90.0, float(options.subtitle_position_x)))
+            updates["subtitle_position_x"] = max(0.0, min(100.0, float(options.subtitle_position_x)))
         if options.subtitle_position_y is not None:
-            updates["subtitle_position_y"] = max(3.0, min(45.0, float(options.subtitle_position_y)))
+            updates["subtitle_position_y"] = max(0.0, min(100.0, float(options.subtitle_position_y)))
         return self.config.render.model_copy(update=updates) if updates else self.config.render
 
     def _candidate_render_encoder_names(self, requested_encoder: str | None = None) -> list[str]:

@@ -958,6 +958,7 @@ body.resizing-canvas * {
   white-space: pre-line;
   cursor: move;
   user-select: none;
+  z-index: 3;
 }
 
 .original-subtitle-cover {
@@ -970,9 +971,11 @@ body.resizing-canvas * {
   background: rgba(255, 255, 255, 0.015);
   opacity: 0.72;
   border-radius: 999px;
-  pointer-events: none;
-  transform: translateX(-50%);
+  pointer-events: auto;
+  transform: none;
   overflow: hidden;
+  cursor: move;
+  z-index: 2;
 }
 
 .original-subtitle-cover.box-cover {
@@ -986,7 +989,9 @@ body.subtitle-style-mode .subtitle-overlay {
 }
 
 body.dragging-subtitle,
-body.dragging-subtitle * {
+body.dragging-subtitle *,
+body.dragging-cover,
+body.dragging-cover * {
   cursor: move !important;
   user-select: none;
 }

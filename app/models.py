@@ -79,6 +79,8 @@ class PipelineRunOptions(BaseModel):
     subtitle_cover_opacity: float | None = None
     subtitle_cover_height_ratio: float | None = None
     subtitle_cover_width_ratio: float | None = None
+    subtitle_cover_position_x: float | None = None
+    subtitle_cover_position_y: float | None = None
     extra_subtitle_tracks: list[SubtitleTrackOption] = Field(default_factory=list)
 
 

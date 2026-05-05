@@ -37,7 +37,7 @@ def process(
     openai_model: str | None = typer.Option(None, help="OpenAI model, vi du gpt-4.1-mini."),
     openai_base_url: str | None = typer.Option(None, help="OpenAI base URL, mac dinh https://api.openai.com/v1."),
     gemini_api_key: str | None = typer.Option(None, help="Gemini API key."),
-    gemini_model: str | None = typer.Option(None, help="Gemini model, vi du gemini-2.5-flash."),
+    gemini_model: str | None = typer.Option(None, help="Gemini model, vi du gemini-2.5-flash-lite."),
     gemini_base_url: str | None = typer.Option(None, help="Gemini API base URL."),
     libretranslate_url: str | None = typer.Option(None, help="URL dich LibreTranslate."),
     libretranslate_api_key: str | None = typer.Option(None, help="API key LibreTranslate."),
@@ -48,6 +48,15 @@ def process(
     voice_name: str | None = typer.Option(None, help="Ten voice edge-tts, vi du vi-VN-HoaiMyNeural."),
     voiceover_gain: float | None = typer.Option(None, help="Muc am luong kenh voice-over."),
     background_audio_gain: float | None = typer.Option(None, help="Muc am luong kenh audio goc khi mix voice-over."),
+    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
+    subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),
+    subtitle_cover_mode: str | None = typer.Option(None, help="Che chu goc: none hoac box."),
+    subtitle_cover_opacity: float | None = typer.Option(None, help="Muc lam mo che chu goc, 0-1."),
+    subtitle_cover_height_ratio: float | None = typer.Option(None, help="Chieu cao vung lam mo, 0.01-1.0."),
+    subtitle_cover_width_ratio: float | None = typer.Option(None, help="Chieu rong vung lam mo, 0.01-1.0."),
+    subtitle_cover_position_x: float | None = typer.Option(None, help="Vi tri ngang vung lam mo, 0-100."),
+    subtitle_cover_position_y: float | None = typer.Option(None, help="Vi tri doc vung lam mo tinh tu duoi len, 0-100."),
 ) -> None:
     """Xu ly mot video: tach audio, ASR, dich, xuat SRT/VTT va tuy chon render."""
     pipeline = _load_pipeline(config)
@@ -73,6 +82,15 @@ def process(
         voice_name=voice_name,
         voiceover_gain=voiceover_gain,
         background_audio_gain=background_audio_gain,
+        subtitle_font_size=subtitle_font_size,
+        subtitle_position_x=subtitle_position_x,
+        subtitle_position_y=subtitle_position_y,
+        subtitle_cover_mode=subtitle_cover_mode,
+        subtitle_cover_opacity=subtitle_cover_opacity,
+        subtitle_cover_height_ratio=subtitle_cover_height_ratio,
+        subtitle_cover_width_ratio=subtitle_cover_width_ratio,
+        subtitle_cover_position_x=subtitle_cover_position_x,
+        subtitle_cover_position_y=subtitle_cover_position_y,
     )
     try:
         manifest = pipeline.process(input.resolve(), options)
@@ -108,11 +126,31 @@ def inspect(
 def render_hardsub(
     job_id: str = typer.Option(..., help="Job ID da co transcript/subtitle."),
     config: Path | None = typer.Option(None, help="Duong dan config YAML."),
+    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
+    subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),
+    subtitle_cover_mode: str | None = typer.Option(None, help="Che chu goc: none hoac box."),
+    subtitle_cover_opacity: float | None = typer.Option(None, help="Muc lam mo che chu goc, 0-1."),
+    subtitle_cover_height_ratio: float | None = typer.Option(None, help="Chieu cao vung lam mo, 0.01-1.0."),
+    subtitle_cover_width_ratio: float | None = typer.Option(None, help="Chieu rong vung lam mo, 0.01-1.0."),
+    subtitle_cover_position_x: float | None = typer.Option(None, help="Vi tri ngang vung lam mo, 0-100."),
+    subtitle_cover_position_y: float | None = typer.Option(None, help="Vi tri doc vung lam mo tinh tu duoi len, 0-100."),
 ) -> None:
     """Burn subtitle hien tai vao video output."""
     pipeline = _load_pipeline(config)
+    options = PipelineRunOptions(
+        subtitle_font_size=subtitle_font_size,
+        subtitle_position_x=subtitle_position_x,
+        subtitle_position_y=subtitle_position_y,
+        subtitle_cover_mode=subtitle_cover_mode,
+        subtitle_cover_opacity=subtitle_cover_opacity,
+        subtitle_cover_height_ratio=subtitle_cover_height_ratio,
+        subtitle_cover_width_ratio=subtitle_cover_width_ratio,
+        subtitle_cover_position_x=subtitle_cover_position_x,
+        subtitle_cover_position_y=subtitle_cover_position_y,
+    )
     try:
-        manifest = pipeline.render_hardsub(job_id)
+        manifest = pipeline.render_hardsub(job_id, options)
     except AppError as exc:
         console.print(f"[red]Loi:[/red] {exc}")
         raise typer.Exit(code=1) from exc

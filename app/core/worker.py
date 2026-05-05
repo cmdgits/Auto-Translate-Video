@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -225,7 +226,7 @@ class JobWorkerService:
         attempt = max(1, manifest.retry_attempt)
         if attempt >= max_attempts:
             return False
-        delay = self._retry_delay(pipeline, attempt)
+        delay = self._retry_delay(pipeline, attempt, str(exc))
         next_at = time.time() + delay
         retry_manifest = manifest.model_copy(
             update={
@@ -287,8 +288,11 @@ class JobWorkerService:
     def _max_attempts(self, pipeline: VideoTranslationPipeline) -> int:
         return max(1, int(pipeline.config.worker.max_attempts))
 
-    def _retry_delay(self, pipeline: VideoTranslationPipeline, failed_attempt: int) -> float:
+    def _retry_delay(self, pipeline: VideoTranslationPipeline, failed_attempt: int, error_text: str = "") -> float:
         config = pipeline.config.worker
+        match = re.search(r"retry in ([\d.]+)s", error_text, re.IGNORECASE)
+        if match:
+            return max(0.0, min(float(match.group(1)) + 1.0, float(config.backoff_max_sec)))
         delay = float(config.backoff_initial_sec) * (float(config.backoff_factor) ** max(0, failed_attempt - 1))
         return max(0.0, min(delay, float(config.backoff_max_sec)))
 

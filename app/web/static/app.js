@@ -32,6 +32,10 @@ const subtitleYValue = document.getElementById("subtitleYValue");
 const subtitleCoverRange = document.getElementById("subtitleCoverRange");
 const subtitleCoverValue = document.getElementById("subtitleCoverValue");
 const subtitleCoverModeSelect = document.getElementById("subtitleCoverModeSelect");
+const subtitleCoverXRange = document.getElementById("subtitleCoverXRange");
+const subtitleCoverXValue = document.getElementById("subtitleCoverXValue");
+const subtitleCoverYRange = document.getElementById("subtitleCoverYRange");
+const subtitleCoverYValue = document.getElementById("subtitleCoverYValue");
 const subtitleCoverHeightRange = document.getElementById("subtitleCoverHeightRange");
 const subtitleCoverHeightValue = document.getElementById("subtitleCoverHeightValue");
 const subtitleCoverWidthRange = document.getElementById("subtitleCoverWidthRange");
@@ -120,6 +124,7 @@ const SUBTITLE_PREVIEW_REFERENCE_WIDTH = 1090;
 const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
 const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
@@ -279,6 +284,8 @@ const state = {
     y: 8,
     coverMode: "box",
     coverOpacity: 72,
+    coverX: 50,
+    coverY: 8,
     coverHeight: 7,
     coverWidth: 86,
   },
@@ -290,6 +297,7 @@ const state = {
   waveformLoading: false,
   canvasResize: null,
   subtitleDrag: null,
+  coverDrag: null,
   liveSegmentId: null,
   segmentPreviewStopHandler: null,
   savePromptResolver: null,
@@ -781,12 +789,14 @@ function applySubtitleStyle(nextStyle = {}) {
   }
   state.subtitleStyle = {
     size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 64, 32),
-    x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 10, 90, 50),
-    y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 3, 45, 8),
+    x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 0, 100, 50),
+    y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 0, 100, 8),
     coverMode: coverMode || "box",
     coverOpacity: clampNumber(nextStyle.coverOpacity ?? state.subtitleStyle.coverOpacity, 0, 100, 72),
-    coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 3, 16, 7),
-    coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 28, 96, 86),
+    coverX: clampNumber(nextStyle.coverX ?? state.subtitleStyle.coverX ?? state.subtitleStyle.x, 0, 100, 50),
+    coverY: clampNumber(nextStyle.coverY ?? state.subtitleStyle.coverY ?? state.subtitleStyle.y, 0, 100, 8),
+    coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 1, 100, 7),
+    coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 1, 100, 86),
   };
   applySubtitleOverlayScale();
   subtitleOverlay.style.left = `${state.subtitleStyle.x}%`;
@@ -796,22 +806,17 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleOverlay.style.width = "max-content";
   subtitleOverlay.style.maxWidth = "84%";
   const compactCoverWidth = state.subtitleStyle.coverWidth;
-  const coverCenter = clampNumber(
-    state.subtitleStyle.x,
-    compactCoverWidth / 2,
-    100 - compactCoverWidth / 2,
-    50,
-  );
-  const coverBottom = Math.max(0, state.subtitleStyle.y - state.subtitleStyle.coverHeight * 0.04);
+  const coverLeft = (100 - compactCoverWidth) * (state.subtitleStyle.coverX / 100);
+  const coverBottom = (100 - state.subtitleStyle.coverHeight) * (state.subtitleStyle.coverY / 100);
   originalSubtitleCover.style.height = `${state.subtitleStyle.coverHeight}%`;
   originalSubtitleCover.style.bottom = `${coverBottom}%`;
   originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "box"
     ? "1"
     : "0";
-  originalSubtitleCover.style.left = `${coverCenter}%`;
+  originalSubtitleCover.style.left = `${coverLeft}%`;
   originalSubtitleCover.style.right = "auto";
   originalSubtitleCover.style.width = `${compactCoverWidth}%`;
-  originalSubtitleCover.style.transform = "translateX(-50%)";
+  originalSubtitleCover.style.transform = "none";
   originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "box"
     ? `blur(${Math.max(4, Math.round(state.subtitleStyle.coverOpacity / 8))}px)`
     : "none";
@@ -825,12 +830,16 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleYRange.value = String(state.subtitleStyle.y);
   subtitleCoverModeSelect.value = state.subtitleStyle.coverMode;
   subtitleCoverRange.value = String(state.subtitleStyle.coverOpacity);
+  subtitleCoverXRange.value = String(state.subtitleStyle.coverX);
+  subtitleCoverYRange.value = String(state.subtitleStyle.coverY);
   subtitleCoverHeightRange.value = String(state.subtitleStyle.coverHeight);
   subtitleCoverWidthRange.value = String(state.subtitleStyle.coverWidth);
   subtitleSizeValue.textContent = `${Math.round(state.subtitleStyle.size)}px`;
   subtitleXValue.textContent = `${Math.round(state.subtitleStyle.x)}%`;
   subtitleYValue.textContent = `${Math.round(state.subtitleStyle.y)}%`;
   subtitleCoverValue.textContent = `${Math.round(state.subtitleStyle.coverOpacity)}%`;
+  subtitleCoverXValue.textContent = `${Math.round(state.subtitleStyle.coverX)}%`;
+  subtitleCoverYValue.textContent = `${Math.round(state.subtitleStyle.coverY)}%`;
   subtitleCoverHeightValue.textContent = `${Math.round(state.subtitleStyle.coverHeight)}%`;
   subtitleCoverWidthValue.textContent = `${Math.round(state.subtitleStyle.coverWidth)}%`;
 }
@@ -853,6 +862,8 @@ function subtitleStylePayload() {
     subtitle_cover_opacity: state.subtitleStyle.coverOpacity / 100,
     subtitle_cover_height_ratio: state.subtitleStyle.coverHeight / 100,
     subtitle_cover_width_ratio: state.subtitleStyle.coverWidth / 100,
+    subtitle_cover_position_x: state.subtitleStyle.coverX,
+    subtitle_cover_position_y: state.subtitleStyle.coverY,
   };
 }
 
@@ -1226,10 +1237,14 @@ function getApiSettings() {
 }
 
 function applyApiSettings(settings) {
+  const normalizedSettings = { ...settings };
+  if (normalizedSettings.gemini_model === "gemini-2.5-flash") {
+    normalizedSettings.gemini_model = DEFAULT_GEMINI_MODEL;
+  }
   API_SETTING_FIELDS.forEach((fieldName) => {
     const input = apiSettingsForm?.elements[fieldName];
-    if (input && Object.prototype.hasOwnProperty.call(settings, fieldName)) {
-      input.value = settings[fieldName] || "";
+    if (input && Object.prototype.hasOwnProperty.call(normalizedSettings, fieldName)) {
+      input.value = normalizedSettings[fieldName] || "";
     }
   });
 }
@@ -2919,6 +2934,18 @@ subtitleCoverHeightRange.addEventListener("input", () => {
   setPreviewButtons();
 });
 
+subtitleCoverXRange.addEventListener("input", () => {
+  applySubtitleStyle({ coverX: subtitleCoverXRange.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleCoverYRange.addEventListener("input", () => {
+  applySubtitleStyle({ coverY: subtitleCoverYRange.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
 subtitleCoverWidthRange.addEventListener("input", () => {
   applySubtitleStyle({ coverWidth: subtitleCoverWidthRange.value });
   persistSubtitleStyle();
@@ -2946,6 +2973,20 @@ subtitleOverlay.addEventListener("mousedown", (event) => {
     initialY: state.subtitleStyle.y,
   };
   document.body.classList.add("dragging-subtitle");
+});
+
+originalSubtitleCover.addEventListener("mousedown", (event) => {
+  if (!showSubtitleOverlayInCurrentMode() || state.subtitleStyle.coverMode !== "box") {
+    return;
+  }
+  event.preventDefault();
+  state.coverDrag = {
+    startX: event.clientX,
+    startY: event.clientY,
+    initialX: state.subtitleStyle.coverX,
+    initialY: state.subtitleStyle.coverY,
+  };
+  document.body.classList.add("dragging-cover");
 });
 
 timelineZoomRange.addEventListener("input", () => {
@@ -3338,6 +3379,17 @@ document.addEventListener("mousemove", (event) => {
     return;
   }
 
+  if (state.coverDrag) {
+    const rect = canvasFrame.getBoundingClientRect();
+    const deltaX = ((event.clientX - state.coverDrag.startX) / Math.max(rect.width, 1)) * 100;
+    const deltaY = ((event.clientY - state.coverDrag.startY) / Math.max(rect.height, 1)) * 100;
+    applySubtitleStyle({
+      coverX: state.coverDrag.initialX + deltaX,
+      coverY: state.coverDrag.initialY - deltaY,
+    });
+    return;
+  }
+
   if (!state.drag || !state.job?.duration_sec) {
     return;
   }
@@ -3383,6 +3435,12 @@ document.addEventListener("mouseup", () => {
   if (state.subtitleDrag) {
     state.subtitleDrag = null;
     document.body.classList.remove("dragging-subtitle");
+    persistSubtitleStyle();
+  }
+
+  if (state.coverDrag) {
+    state.coverDrag = null;
+    document.body.classList.remove("dragging-cover");
     persistSubtitleStyle();
   }
 

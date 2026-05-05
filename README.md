@@ -17,8 +17,8 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Hiển thị waveform âm thanh trên timeline để canh lời thoại trực quan hơn.
 - Phóng to, thu nhỏ video và timeline để canh vị trí, thời gian hiển thị phụ đề dễ hơn.
 - Kéo cả đoạn phụ đề hoặc kéo mép trái/phải để chỉnh thời gian, có snap nhẹ theo playhead.
-- Tùy chỉnh kích thước, vị trí và vùng hiển thị phụ đề trên video.
-- Làm mờ vùng chữ gốc bằng bộ lọc FFmpeg.
+- Tùy chỉnh kích thước và vị trí phụ đề trên toàn bộ khung video.
+- Làm mờ vùng chữ gốc bằng bộ lọc FFmpeg; vùng mờ có vị trí và kích thước riêng, không bị dính với vị trí phụ đề.
 - Tự lưu nháp phụ đề trên trình duyệt để tránh mất nội dung khi đang sửa.
 - Có nút dừng tác vụ khi dịch, tạo phụ đề hoặc render quá lâu.
 - Queue worker xử lý tác vụ nền, có thể chạy trong web hoặc chạy như service riêng bằng CLI.
@@ -163,7 +163,8 @@ http://127.0.0.1:8001
 
 - Chọn chế độ xem phụ đề để kiểm tra chữ hiển thị trên video.
 - Dùng cụm nút dưới khung video để lùi 5 giây, phát/tạm dừng hoặc tiến 5 giây; khung xem trước không hiện thanh điều khiển mặc định của trình duyệt.
-- Tùy chỉnh cỡ chữ, vị trí, vùng đặt phụ đề và độ che phủ chữ gốc.
+- Tùy chỉnh cỡ chữ và đặt phụ đề ở bất kỳ vị trí nào trong khung video.
+- Tùy chỉnh vùng làm mờ che chữ gốc riêng biệt với phụ đề: ngang, dọc, chiều cao, chiều rộng và mức mờ đều chỉnh độc lập.
 - Nếu video có chữ gốc, có thể dùng chế độ làm mờ vùng chữ cũ thay vì phủ màu cứng.
 - Khi phóng to hoặc thu nhỏ video, phụ đề sẽ co giãn theo khung video để dễ canh chỉnh.
 
@@ -267,7 +268,7 @@ translation:
   backend: gemini
   target_language: vi
   gemini_api_key: YOUR_GEMINI_API_KEY
-  gemini_model: gemini-2.5-flash
+  gemini_model: gemini-2.5-flash-lite
 ```
 
 Các backend dịch thường dùng:
@@ -289,7 +290,7 @@ Glossary thuật ngữ:
 
 Lưu ý khi dùng Gemini:
 
-- Tên model nên để dạng ngắn như `gemini-2.5-flash`, không nhập kèm tiền tố `models/` nếu giao diện hoặc cấu hình đã tự xử lý.
+- Tên model nên để dạng ngắn như `gemini-2.5-flash-lite`, không nhập kèm tiền tố `models/` nếu giao diện hoặc cấu hình đã tự xử lý.
 - Nếu gặp lỗi `unexpected model name format`, hãy kiểm tra lại tên model trong phần cài đặt API.
 
 ## Cấu Hình Giọng Đọc
@@ -378,6 +379,12 @@ Xử lý video và xuất luôn video phụ đề:
 
 ```powershell
 python -m app.main process --input "C:\videos\sample.mp4" --hardsub
+```
+
+Ví dụ đặt phụ đề và vùng mờ che chữ gốc độc lập khi render:
+
+```powershell
+python -m app.main process --input "C:\videos\sample.mp4" --hardsub --subtitle-position-x 50 --subtitle-position-y 8 --subtitle-cover-position-x 50 --subtitle-cover-position-y 8 --subtitle-cover-width-ratio 0.86 --subtitle-cover-height-ratio 0.07
 ```
 
 Xử lý video và xuất luôn video thuyết minh:
@@ -476,7 +483,7 @@ Nếu hai lệnh trên không chạy, hãy cài FFmpeg hoặc sửa đường d�
 
 ### Dịch Gemini lỗi 400
 
-Kiểm tra API key, base URL và tên model. Tên model nên để dạng `gemini-2.5-flash`. Không nên nhập thừa dạng `models/gemini-2.5-flash` nếu hệ thống đã tự thêm định dạng cần thiết.
+Kiểm tra API key, base URL và tên model. Tên model nên để dạng `gemini-2.5-flash-lite`. Không nên nhập thừa dạng `models/gemini-2.5-flash-lite` nếu hệ thống đã tự thêm định dạng cần thiết.
 
 ### Video xuất ra chưa đúng phụ đề đã sửa
 

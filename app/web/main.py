@@ -243,6 +243,8 @@ def _options_from_form(
     subtitle_cover_opacity: float | None = None,
     subtitle_cover_height_ratio: float | None = None,
     subtitle_cover_width_ratio: float | None = None,
+    subtitle_cover_position_x: float | None = None,
+    subtitle_cover_position_y: float | None = None,
 ) -> PipelineRunOptions:
     selected_backend = (translator_backend or "echo").strip().lower()
     if selected_backend == "echo":
@@ -284,6 +286,8 @@ def _options_from_form(
         subtitle_cover_opacity=subtitle_cover_opacity,
         subtitle_cover_height_ratio=subtitle_cover_height_ratio,
         subtitle_cover_width_ratio=subtitle_cover_width_ratio,
+        subtitle_cover_position_x=subtitle_cover_position_x,
+        subtitle_cover_position_y=subtitle_cover_position_y,
     )
 
 
@@ -393,6 +397,8 @@ async def create_job(
     subtitle_cover_opacity: float | None = Form(None),
     subtitle_cover_height_ratio: float | None = Form(None),
     subtitle_cover_width_ratio: float | None = Form(None),
+    subtitle_cover_position_x: float | None = Form(None),
+    subtitle_cover_position_y: float | None = Form(None),
 ) -> JSONResponse:
     options = _options_from_form(
         translator_backend,
@@ -423,6 +429,8 @@ async def create_job(
         subtitle_cover_opacity,
         subtitle_cover_height_ratio,
         subtitle_cover_width_ratio,
+        subtitle_cover_position_x,
+        subtitle_cover_position_y,
     )
     manifest = await _create_queued_job(file, options)
     return JSONResponse(_manifest_payload(manifest))
@@ -459,6 +467,8 @@ async def create_batch_jobs(
     subtitle_cover_opacity: float | None = Form(None),
     subtitle_cover_height_ratio: float | None = Form(None),
     subtitle_cover_width_ratio: float | None = Form(None),
+    subtitle_cover_position_x: float | None = Form(None),
+    subtitle_cover_position_y: float | None = Form(None),
 ) -> JSONResponse:
     if not files:
         raise HTTPException(status_code=400, detail="Chua chon file nao.")
@@ -491,6 +501,8 @@ async def create_batch_jobs(
         subtitle_cover_opacity,
         subtitle_cover_height_ratio,
         subtitle_cover_width_ratio,
+        subtitle_cover_position_x,
+        subtitle_cover_position_y,
     )
     manifests = [await _create_queued_job(file, options) for file in files]
     return JSONResponse({"jobs": [_manifest_payload(manifest) for manifest in manifests]})

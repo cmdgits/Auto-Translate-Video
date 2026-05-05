@@ -25,12 +25,12 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
     if cover_opacity <= 0:
         return ""
 
-    cover_height_ratio = max(0.03, min(render_config.subtitle_cover_height_ratio, 0.16))
-    subtitle_x_ratio = max(0.12, min(float(render_config.subtitle_position_x) / 100, 0.88))
-    subtitle_bottom_ratio = max(0.02, min(float(render_config.subtitle_position_y) / 100, 0.45))
-    cover_width_ratio = max(0.28, min(float(render_config.subtitle_cover_width_ratio), 0.96))
-    cover_left_ratio = max(0.0, min(subtitle_x_ratio - cover_width_ratio / 2, 1.0 - cover_width_ratio))
-    cover_top = max(0.0, min(1.0 - subtitle_bottom_ratio - cover_height_ratio * 0.95, 1.0 - cover_height_ratio))
+    cover_height_ratio = max(0.01, min(float(render_config.subtitle_cover_height_ratio), 1.0))
+    cover_width_ratio = max(0.01, min(float(render_config.subtitle_cover_width_ratio), 1.0))
+    cover_x_ratio = max(0.0, min(float(getattr(render_config, "subtitle_cover_position_x", 50)) / 100, 1.0))
+    cover_y_ratio = max(0.0, min(float(getattr(render_config, "subtitle_cover_position_y", 8)) / 100, 1.0))
+    cover_left_ratio = (1.0 - cover_width_ratio) * cover_x_ratio
+    cover_top = (1.0 - cover_height_ratio) * (1.0 - cover_y_ratio)
     cover_mode = str(render_config.subtitle_cover_mode or "box").strip().lower()
     if cover_mode in {"none", "off", "disabled"}:
         return ""

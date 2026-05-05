@@ -58,7 +58,11 @@ def format_translator_http_error(provider: str, response: httpx.Response) -> str
             "khác với token/session còn lại trong Codex, Antigravity hoặc giao diện chat."
         )
     elif status_code == 429:
-        reason = "Lỗi 429: Đã vượt quá số lượt gọi API trong 1 phút (Rate Limit) HOẶC hết quota. Với key Gemini miễn phí, giới hạn là 15 request/phút. Phần mềm sẽ tự động thử lại, nhưng nếu vẫn lỗi, hãy thử tăng 'batch_size' trong file config lên 30."
+        reason = (
+            "Lỗi 429: Đã vượt quá rate limit hoặc quota của API key/model hiện tại. "
+            "Giới hạn Gemini phụ thuộc model và tier tài khoản; hãy chờ hết thời gian retry, dùng model nhẹ hơn, "
+            "tăng batch_size hoặc bật billing nếu cần xử lý nhiều video."
+        )
     elif status_code >= 500:
         reason = "Máy chủ dịch đang lỗi tạm thời. Hãy thử lại sau."
     else:
