@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-45" />
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-56" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -243,19 +243,53 @@
           <div class="artifact-bar">
             <div class="toolbar-group import-group">
               <input id="subtitleFile" class="toolbar-file-input" type="file" accept=".srt,.vtt,.json,text/plain,text/vtt,application/json" />
-              <button class="import-button compact-import" id="importSubtitleBtn" type="button">＋ Nhập phụ đề</button>
+              <button class="import-button compact-import" id="importSubtitleBtn" type="button">📥 Nhập phụ đề</button>
+            </div>
+            <div class="toolbar-group track-import-group" aria-label="Thêm track phụ đề MKV">
+              <input id="extraSubtitleFile" class="toolbar-file-input" type="file" accept=".srt,.vtt,.ass,.json,text/plain,text/vtt,application/json" multiple />
+              <button class="import-button compact-import" id="addSubtitleTrackBtn" type="button" aria-controls="subtitleTrackPopover" aria-expanded="false">🎞️ Track MKV</button>
+              <span class="toolbar-count" id="subtitleTrackCount">0 track</span>
+              <div class="subtitle-track-popover hidden" id="subtitleTrackPopover" role="dialog" aria-label="Quản lý track phụ đề MKV">
+                <div class="track-popover-head">
+                  <strong>Track phụ đề MKV</strong>
+                  <button class="mini-button" id="closeSubtitleTrackPanelBtn" type="button">Đóng</button>
+                </div>
+                <p class="muted track-panel-hint">MKV tự kèm tiếng Việt + phụ đề gốc. Thêm track nếu muốn kèm Anh/Trung/Nhật.</p>
+                <button class="secondary-action track-file-button" id="chooseSubtitleTrackBtn" type="button">＋ Chọn file phụ đề</button>
+                <div class="subtitle-track-list" id="subtitleTrackList">
+                  <div class="script-empty">Chưa thêm track phụ đề riêng.</div>
+                </div>
+              </div>
             </div>
             <div class="toolbar-group edit-action-group">
-              <button class="secondary-action" id="translateSubtitleBtn" type="button">Dịch lại tiếng Việt</button>
+              <button class="secondary-action" id="translateSubtitleBtn" type="button">🌐 Dịch tiếng Việt</button>
             </div>
-            <div class="toolbar-group file-format-group" aria-label="Tải file phụ đề">
-              <a class="artifact-link disabled" href="#" id="sourceSrtLink">Lưu phụ đề gốc</a>
-              <a class="artifact-link disabled" href="#" id="srtLink">Lưu phụ đề dịch</a>
+            <div class="toolbar-group subtitle-export-group" aria-label="Export phụ đề">
+              <button class="import-button compact-import" id="exportSubtitleBtn" type="button" aria-controls="exportSubtitlePopover" aria-expanded="false">📄 Export phụ đề</button>
+              <div class="toolbar-popover export-popover hidden" id="exportSubtitlePopover" role="dialog" aria-label="Export phụ đề">
+                <div class="track-popover-head">
+                  <strong>Export phụ đề</strong>
+                  <button class="mini-button" id="closeExportSubtitleBtn" type="button">Đóng</button>
+                </div>
+                <div class="popover-action-list">
+                  <a class="artifact-link popover-action disabled" href="#" id="sourceSrtLink"><span>🌐</span>Lưu phụ đề gốc</a>
+                  <a class="artifact-link popover-action disabled" href="#" id="srtLink"><span>🇻🇳</span>Lưu phụ đề dịch</a>
+                </div>
+              </div>
             </div>
-            <div class="toolbar-group export-format-group" aria-label="Xuất video">
-              <a class="artifact-link disabled" href="#" id="hardsubLink">MP4 phụ đề</a>
-              <a class="artifact-link disabled" href="#" id="softsubLink">MKV softsub</a>
-              <a class="artifact-link disabled" href="#" id="voiceoverLink">MP4 thuyết minh</a>
+            <div class="toolbar-group video-export-group" aria-label="Export Video">
+              <button class="import-button compact-import" id="exportVideoBtn" type="button" aria-controls="exportVideoPopover" aria-expanded="false">🎬 Export Video</button>
+              <div class="toolbar-popover export-popover align-right hidden" id="exportVideoPopover" role="dialog" aria-label="Export Video">
+                <div class="track-popover-head">
+                  <strong>Export Video</strong>
+                  <button class="mini-button" id="closeExportVideoBtn" type="button">Đóng</button>
+                </div>
+                <div class="popover-action-list">
+                  <a class="artifact-link popover-action disabled" href="#" id="hardsubLink"><span>💬</span>MP4 phụ đề</a>
+                  <a class="artifact-link popover-action disabled" href="#" id="softsubLink"><span>📦</span>MKV softsub</a>
+                  <a class="artifact-link popover-action disabled" href="#" id="voiceoverLink"><span>🎙️</span>MP4 thuyết minh</a>
+                </div>
+              </div>
             </div>
           </div>
           <div class="preview-switches toolbar-group">
@@ -277,14 +311,14 @@
           </div>
           <div class="timeline-track" id="timelineTrack">
             <div class="timeline-ruler" id="timelineRuler"></div>
-            <canvas class="timeline-waveform" id="timelineWaveform" height="54"></canvas>
+            <canvas class="timeline-waveform" id="timelineWaveform" height="68"></canvas>
             <div class="timeline-lane" id="timelineLane"></div>
           </div>
         </section>
       </main>
 
       <aside class="inspector-panel">
-        <section class="inspector-card">
+        <section class="inspector-card segment-editor-card">
           <p class="eyebrow">Đoạn phụ đề</p>
           <h3 id="selectedClipTitle">Chưa chọn đoạn</h3>
           <span class="muted" id="selectedClipRange">--</span>
@@ -319,18 +353,6 @@
           </div>
         </section>
 
-        <section class="inspector-card subtitle-track-panel">
-          <div class="section-title track-panel-title">
-            <span>Track phụ đề MKV</span>
-            <button class="mini-button" id="addSubtitleTrackBtn" type="button">＋ Thêm track</button>
-          </div>
-          <input id="extraSubtitleFile" class="toolbar-file-input" type="file" accept=".srt,.vtt,.ass,.json,text/plain,text/vtt,application/json" multiple />
-          <p class="muted track-panel-hint">MKV luôn có phụ đề tiếng Việt và phụ đề gốc. Thêm track ở đây nếu muốn kèm Anh/Trung/Nhật...</p>
-          <div class="subtitle-track-list" id="subtitleTrackList">
-            <div class="script-empty">Chưa thêm track phụ đề riêng.</div>
-          </div>
-        </section>
-
         <section class="inspector-card script-panel">
           <div class="section-title"><span>Danh sách phụ đề</span></div>
           <div class="script-list" id="scriptList">
@@ -353,6 +375,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-45" defer></script>
+    <script src="/static/app.js?v=capcut-layout-20260504-56" defer></script>
   </body>
 </html>

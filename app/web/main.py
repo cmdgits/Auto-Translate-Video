@@ -34,6 +34,9 @@ templates = Jinja2Templates(directory=str(WEB_ROOT / "templates"))
 app = FastAPI(title="Auto Translate Video")
 app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
 
+_local_render_lock = threading.Lock()
+_local_render_threads: dict[tuple[str, str], threading.Thread] = {}
+
 @lru_cache
 def get_config() -> AppConfig:
     return AppConfig.load()
@@ -116,6 +119,39 @@ def _get_manifest_or_404(job_id: str) -> JobManifest:
     if manifest is None:
         raise HTTPException(status_code=404, detail="Khong tim thay job.")
     return manifest
+
+
+def _has_active_local_render(job_id: str, task_type: str) -> bool:
+    key = (job_id, task_type)
+    with _local_render_lock:
+        thread = _local_render_threads.get(key)
+        if thread and thread.is_alive():
+            return True
+        _local_render_threads.pop(key, None)
+    return False
+
+
+def _start_local_render(job_id: str, task_type: str, target) -> bool:
+    key = (job_id, task_type)
+
+    def runner() -> None:
+        try:
+            target()
+        except Exception:
+            return
+        finally:
+            with _local_render_lock:
+                if _local_render_threads.get(key) is threading.current_thread():
+                    _local_render_threads.pop(key, None)
+
+    with _local_render_lock:
+        thread = _local_render_threads.get(key)
+        if thread and thread.is_alive():
+            return False
+        thread = threading.Thread(target=runner, name=f"{task_type}-{job_id}", daemon=True)
+        _local_render_threads[key] = thread
+        thread.start()
+    return True
 
 
 def _mark_job_running(job_id: str, stage: str, progress: float) -> JobManifest:
@@ -470,7 +506,11 @@ async def render_hardsub(
 @app.post("/api/jobs/{job_id}/render/softsub")
 async def render_softsub(job_id: str, options: PipelineRunOptions | None = Body(default=None)) -> JSONResponse:
     manifest = _get_manifest_or_404(job_id)
-    if manifest.status in {"queued", "running"} and manifest.stage == "rendering_softsub":
+    if (
+        manifest.status in {"queued", "running"}
+        and manifest.stage == "rendering_softsub"
+        and _has_active_local_render(job_id, "render_softsub")
+    ):
         return JSONResponse(_manifest_payload(manifest))
 
     run_options = options or PipelineRunOptions()
@@ -492,7 +532,7 @@ async def render_softsub(job_id: str, options: PipelineRunOptions | None = Body(
         except Exception:
             return
 
-    threading.Thread(target=run_softsub_render, name=f"softsub-render-{job_id}", daemon=True).start()
+    _start_local_render(job_id, "render_softsub", run_softsub_render)
     return JSONResponse(_manifest_payload(queued_manifest))
 
 
@@ -514,10 +554,39 @@ async def translate_job(job_id: str, options: PipelineRunOptions) -> JSONRespons
 
 
 @app.post("/api/jobs/{job_id}/render/voiceover")
-async def render_voiceover(job_id: str, options: PipelineRunOptions) -> JSONResponse:
-    render_options = options.model_copy(update={"generate_voiceover": True})
-    manifest = get_job_queue().enqueue_existing(job_id, "render_voiceover", render_options)
-    return JSONResponse(_manifest_payload(manifest))
+async def render_voiceover(
+    job_id: str,
+    options: PipelineRunOptions | None = Body(default=None),
+) -> JSONResponse:
+    manifest = _get_manifest_or_404(job_id)
+    if (
+        manifest.status in {"queued", "running"}
+        and manifest.stage == "rendering_voiceover"
+        and _has_active_local_render(job_id, "render_voiceover")
+    ):
+        return JSONResponse(_manifest_payload(manifest))
+
+    render_options = (options or PipelineRunOptions()).model_copy(update={"generate_voiceover": True})
+    queued_manifest = manifest.model_copy(
+        update={
+            "status": "queued",
+            "stage": "rendering_voiceover",
+            "progress": 0.0,
+            "task_type": "render_voiceover",
+            "options": {**(manifest.options or {}), **sanitize_pipeline_options(render_options)},
+            "errors": [],
+        }
+    )
+    get_pipeline().jobs.update_manifest(queued_manifest)
+
+    def run_voiceover_render() -> None:
+        try:
+            get_pipeline().render_voiceover(job_id, render_options)
+        except Exception:
+            return
+
+    _start_local_render(job_id, "render_voiceover", run_voiceover_render)
+    return JSONResponse(_manifest_payload(queued_manifest))
 
 
 @app.get("/api/source/{job_id}")

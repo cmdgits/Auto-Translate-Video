@@ -7,7 +7,11 @@ const subtitleFileInput = document.getElementById("subtitleFile");
 const importSubtitleBtn = document.getElementById("importSubtitleBtn");
 const extraSubtitleFileInput = document.getElementById("extraSubtitleFile");
 const addSubtitleTrackBtn = document.getElementById("addSubtitleTrackBtn");
+const chooseSubtitleTrackBtn = document.getElementById("chooseSubtitleTrackBtn");
+const closeSubtitleTrackPanelBtn = document.getElementById("closeSubtitleTrackPanelBtn");
+const subtitleTrackPopover = document.getElementById("subtitleTrackPopover");
 const subtitleTrackList = document.getElementById("subtitleTrackList");
+const subtitleTrackCount = document.getElementById("subtitleTrackCount");
 const videoPreview = document.getElementById("videoPreview");
 const canvasFrame = document.getElementById("canvasFrame");
 const canvasControls = document.getElementById("canvasControls");
@@ -55,6 +59,12 @@ const jsonLink = document.getElementById("jsonLink");
 const hardsubLink = document.getElementById("hardsubLink");
 const softsubLink = document.getElementById("softsubLink");
 const voiceoverLink = document.getElementById("voiceoverLink");
+const exportSubtitleBtn = document.getElementById("exportSubtitleBtn");
+const exportSubtitlePopover = document.getElementById("exportSubtitlePopover");
+const closeExportSubtitleBtn = document.getElementById("closeExportSubtitleBtn");
+const exportVideoBtn = document.getElementById("exportVideoBtn");
+const exportVideoPopover = document.getElementById("exportVideoPopover");
+const closeExportVideoBtn = document.getElementById("closeExportVideoBtn");
 const previewSourceBtn = document.getElementById("previewSourceBtn");
 const previewHardsubBtn = document.getElementById("previewHardsubBtn");
 const previewVoiceoverBtn = document.getElementById("previewVoiceoverBtn");
@@ -695,7 +705,7 @@ function loadExtraSubtitleTracks(jobId) {
       ? saved.filter((track) => track && track.content).map((track, index) => ({
         id: track.id || `${Date.now()}-${index}`,
         title: String(track.title || track.fileName || `Phụ đề ${index + 1}`).trim(),
-        language: normalizeSubtitleLanguage(track.language || guessSubtitleLanguage(track.fileName || track.title || "")),
+        language: resolveSubtitleTrackLanguage(track),
         fileName: String(track.fileName || "").trim(),
         content: String(track.content || ""),
         isDefault: Boolean(track.isDefault),
@@ -707,30 +717,121 @@ function loadExtraSubtitleTracks(jobId) {
 }
 
 function normalizeSubtitleLanguage(value) {
-  const language = String(value || "und").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  return language || "und";
+  const language = String(value || "und").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+  const aliases = {
+    VI: "VN",
+    VIE: "VN",
+    ENG: "EN",
+    ZHO: "ZH",
+    CHI: "ZH",
+    CN: "ZH",
+    JPN: "JP",
+    JA: "JP",
+    KOR: "KR",
+    KO: "KR",
+    THA: "TH",
+    IND: "ID",
+    FRA: "FR",
+    FRE: "FR",
+    DEU: "DE",
+    GER: "DE",
+    SPA: "ES",
+  };
+  return aliases[language] || language || "UND";
+}
+
+function subtitleLanguageForMux(value) {
+  const language = normalizeSubtitleLanguage(value);
+  const muxCodes = {
+    VN: "vie",
+    EN: "eng",
+    ZH: "zho",
+    JP: "jpn",
+    KR: "kor",
+    TH: "tha",
+    ID: "ind",
+    FR: "fra",
+    DE: "deu",
+    ES: "spa",
+    UND: "und",
+  };
+  return muxCodes[language] || language.toLowerCase();
+}
+
+function subtitleLanguageAliases() {
+  return {
+    vi: "VN",
+    vn: "VN",
+    vie: "VN",
+    en: "EN",
+    eng: "EN",
+    zh: "ZH",
+    zho: "ZH",
+    chi: "ZH",
+    cn: "ZH",
+    ja: "JP",
+    jp: "JP",
+    jpn: "JP",
+    ko: "KR",
+    kr: "KR",
+    kor: "KR",
+    th: "TH",
+    tha: "TH",
+    id: "ID",
+    ind: "ID",
+    fr: "FR",
+    fra: "FR",
+    fre: "FR",
+    de: "DE",
+    deu: "DE",
+    ger: "DE",
+    es: "ES",
+    spa: "ES",
+  };
+}
+
+function subtitleLanguageTokens(value = "") {
+  return String(value || "")
+    .replace(/\.[a-z0-9]{1,8}$/i, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function isVietnameseSubtitleWordDe(tokens, index) {
+  return tokens[index] === "de" && (
+    tokens[index - 1] === "phu"
+    || tokens[index + 1] === "goc"
+    || tokens[index + 1] === "dich"
+    || tokens[index + 1] === "viet"
+  );
 }
 
 function guessSubtitleLanguage(fileName = "") {
-  const text = String(fileName || "").toLowerCase();
-  const tokenMatch = text.match(/(?:^|[._\-\s])(vi|vie|en|eng|zh|zho|chi|ja|jpn|ko|kor|th|tha|id|ind|fr|fra|fre|de|deu|ger|es|spa)(?:[._\-\s]|$)/i);
-  const token = tokenMatch?.[1]?.toLowerCase();
-  const aliases = {
-    vi: "vie",
-    en: "eng",
-    zh: "zho",
-    chi: "zho",
-    ja: "jpn",
-    ko: "kor",
-    th: "tha",
-    id: "ind",
-    fr: "fra",
-    fre: "fra",
-    de: "deu",
-    ger: "deu",
-    es: "spa",
-  };
-  return aliases[token] || token || "und";
+  const aliases = subtitleLanguageAliases();
+  const tokens = subtitleLanguageTokens(fileName);
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const language = aliases[tokens[index]];
+    if (!language || isVietnameseSubtitleWordDe(tokens, index)) {
+      continue;
+    }
+    return language;
+  }
+  return "UND";
+}
+
+function resolveSubtitleTrackLanguage(track = {}) {
+  const savedLanguage = normalizeSubtitleLanguage(track.language || "");
+  const guessedLanguage = guessSubtitleLanguage(track.fileName || track.title || "");
+  if (!track.language) {
+    return guessedLanguage;
+  }
+  if (savedLanguage === "DE" && guessedLanguage !== "UND" && guessedLanguage !== "DE") {
+    return guessedLanguage;
+  }
+  return savedLanguage || guessedLanguage;
 }
 
 function subtitleTrackTitleFromFile(fileName, index) {
@@ -739,6 +840,11 @@ function subtitleTrackTitleFromFile(fileName, index) {
 }
 
 function renderSubtitleTrackList() {
+  if (subtitleTrackCount) {
+    const count = state.extraSubtitleTracks.length;
+    subtitleTrackCount.textContent = `${count} track`;
+    subtitleTrackCount.classList.toggle("active", count > 0);
+  }
   if (!subtitleTrackList) {
     return;
   }
@@ -751,22 +857,54 @@ function renderSubtitleTrackList() {
     const item = document.createElement("div");
     item.className = "subtitle-track-item";
     item.dataset.id = track.id;
+    const lineCount = track.content.split(/\r?\n/).filter(Boolean).length;
     item.innerHTML = `
       <div class="subtitle-track-head">
-        <strong>${escapeHtml(track.title || track.fileName || `Phụ đề ${index + 1}`)}</strong>
+        <span class="track-language-pill">${escapeHtml(normalizeSubtitleLanguage(track.language))}</span>
+        <strong title="${escapeHtml(track.title || track.fileName || `Phụ đề ${index + 1}`)}">${escapeHtml(track.title || track.fileName || `Phụ đề ${index + 1}`)}</strong>
         <div class="subtitle-track-actions">
-          <button class="subtitle-track-default ${track.isDefault ? "active" : ""}" type="button" data-track-action="default" title="Đặt làm track mặc định">${track.isDefault ? "Mặc định" : "Đặt mặc định"}</button>
-          <button type="button" data-track-action="remove" title="Xoá track này">Xoá</button>
+          <button class="subtitle-track-default ${track.isDefault ? "active" : ""}" type="button" data-track-action="default" title="Đặt làm track mặc định">${track.isDefault ? "✓" : "MĐ"}</button>
+          <button type="button" data-track-action="remove" title="Xoá track này">×</button>
         </div>
       </div>
       <div class="subtitle-track-meta">
-        <label>Tên track<input data-track-field="title" value="${escapeHtml(track.title || "")}" /></label>
-        <label>Mã ngôn ngữ<input data-track-field="language" value="${escapeHtml(track.language || "und")}" maxlength="12" /></label>
+        <input aria-label="Tên track" data-track-field="title" value="${escapeHtml(track.title || "")}" />
+        <input aria-label="Mã ngôn ngữ" data-track-field="language" value="${escapeHtml(normalizeSubtitleLanguage(track.language))}" maxlength="3" />
       </div>
-      <div class="subtitle-track-note">${escapeHtml(track.fileName || "Track phụ đề thêm")} · ${track.content.split(/\r?\n/).filter(Boolean).length} dòng</div>
+      <div class="subtitle-track-note">${escapeHtml(track.fileName || "Track phụ đề thêm")} · ${lineCount} dòng</div>
     `;
     subtitleTrackList.appendChild(item);
   });
+}
+
+function setSubtitleTrackPopoverOpen(open) {
+  if (!subtitleTrackPopover || !addSubtitleTrackBtn) {
+    return;
+  }
+  subtitleTrackPopover.classList.toggle("hidden", !open);
+  addSubtitleTrackBtn.classList.toggle("active", open);
+  addSubtitleTrackBtn.setAttribute("aria-expanded", String(open));
+}
+
+function setToolbarPopoverOpen(popover, trigger, open) {
+  if (!popover || !trigger) {
+    return;
+  }
+  popover.classList.toggle("hidden", !open);
+  trigger.classList.toggle("active", open);
+  trigger.setAttribute("aria-expanded", String(open));
+}
+
+function closeToolbarPopovers(exceptPopover = null) {
+  if (exceptPopover !== subtitleTrackPopover) {
+    setSubtitleTrackPopoverOpen(false);
+  }
+  if (exceptPopover !== exportSubtitlePopover) {
+    setToolbarPopoverOpen(exportSubtitlePopover, exportSubtitleBtn, false);
+  }
+  if (exceptPopover !== exportVideoPopover) {
+    setToolbarPopoverOpen(exportVideoPopover, exportVideoBtn, false);
+  }
 }
 
 function extraSubtitleTracksPayload() {
@@ -774,7 +912,7 @@ function extraSubtitleTracksPayload() {
     .filter((track) => String(track.content || "").trim())
     .map((track) => ({
       title: String(track.title || track.fileName || "Phụ đề thêm").trim(),
-      language: normalizeSubtitleLanguage(track.language),
+      language: subtitleLanguageForMux(track.language),
       content: String(track.content || ""),
       file_name: String(track.fileName || "").trim() || null,
       is_default: Boolean(track.isDefault),
@@ -1432,38 +1570,65 @@ function drawWaveform() {
     return;
   }
   const width = Math.max(1, Math.round(state.laneWidth || timelineTrack.clientWidth || 1));
-  const height = Math.max(1, timelineWaveform.height || 54);
-  if (timelineWaveform.width !== width) {
-    timelineWaveform.width = width;
+  const height = Math.max(58, Math.round(timelineWaveform.clientHeight || 68));
+  const pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+  const canvasWidth = Math.round(width * pixelRatio);
+  const canvasHeight = Math.round(height * pixelRatio);
+  if (timelineWaveform.width !== canvasWidth) {
+    timelineWaveform.width = canvasWidth;
+  }
+  if (timelineWaveform.height !== canvasHeight) {
+    timelineWaveform.height = canvasHeight;
   }
   timelineWaveform.style.width = `${width}px`;
+  timelineWaveform.style.height = `${height}px`;
   const context = timelineWaveform.getContext("2d");
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = "#eef3f8";
+  context.fillStyle = "#f7fff9";
+  context.fillRect(0, 0, width, height);
+  const gradient = context.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(1, "#dcfce7");
+  context.fillStyle = gradient;
   context.fillRect(0, 0, width, height);
   const peaks = state.waveform?.peaks || [];
   if (!peaks.length) {
-    context.fillStyle = "#94a3b8";
-    context.font = "12px system-ui";
-    context.fillText(state.waveformLoading ? "Đang tải waveform..." : "Chưa có waveform", 12, 31);
+    context.fillStyle = "#475569";
+    context.font = "700 12px system-ui";
+    context.fillText(state.waveformLoading ? "Đang tải waveform..." : "Chưa có waveform", 12, Math.round(height / 2) + 4);
     return;
   }
   const centerY = height / 2;
-  context.strokeStyle = "rgba(15, 118, 110, 0.22)";
+  context.strokeStyle = "rgba(15, 23, 42, 0.10)";
+  context.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach((ratio) => {
+    const y = Math.round(height * ratio) + 0.5;
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+    context.stroke();
+  });
+  context.strokeStyle = "rgba(15, 23, 42, 0.22)";
+  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(0, centerY);
   context.lineTo(width, centerY);
   context.stroke();
-  context.strokeStyle = "#0f766e";
-  context.lineWidth = 1;
+  const maxPeak = Math.max(...peaks.map((peak) => Number(peak || 0)).filter(Number.isFinite), 0.01);
   const step = width / peaks.length;
+  const barWidth = Math.max(1, Math.min(3, step * 0.55));
+  const waveformGradient = context.createLinearGradient(0, 0, 0, height);
+  waveformGradient.addColorStop(0, "#4ade80");
+  waveformGradient.addColorStop(0.5, "#22c55e");
+  waveformGradient.addColorStop(1, "#16a34a");
+  context.fillStyle = waveformGradient;
   peaks.forEach((peak, index) => {
-    const x = Math.round(index * step);
-    const amplitude = Math.max(1, Number(peak || 0) * (height * 0.46));
-    context.beginPath();
-    context.moveTo(x, centerY - amplitude);
-    context.lineTo(x, centerY + amplitude);
-    context.stroke();
+    const x = Math.round(index * step - barWidth / 2);
+    const normalizedPeak = Math.max(0, Math.min(1, Number(peak || 0) / maxPeak));
+    const boostedPeak = Math.pow(normalizedPeak, 0.72);
+    const amplitude = Math.max(1.5, boostedPeak * (height * 0.38));
+    context.fillRect(x, centerY - amplitude, barWidth, amplitude * 2);
   });
 }
 
@@ -2359,11 +2524,62 @@ subtitleFileInput.addEventListener("change", async () => {
   }
 });
 
-if (addSubtitleTrackBtn && extraSubtitleFileInput) {
+if (addSubtitleTrackBtn && subtitleTrackPopover) {
   addSubtitleTrackBtn.addEventListener("click", () => {
+    const shouldOpen = subtitleTrackPopover.classList.contains("hidden");
+    closeToolbarPopovers(subtitleTrackPopover);
+    setSubtitleTrackPopoverOpen(shouldOpen);
+  });
+}
+
+if (exportSubtitleBtn && exportSubtitlePopover) {
+  exportSubtitleBtn.addEventListener("click", () => {
+    const shouldOpen = exportSubtitlePopover.classList.contains("hidden");
+    closeToolbarPopovers(exportSubtitlePopover);
+    setToolbarPopoverOpen(exportSubtitlePopover, exportSubtitleBtn, shouldOpen);
+  });
+}
+
+if (closeExportSubtitleBtn) {
+  closeExportSubtitleBtn.addEventListener("click", () => setToolbarPopoverOpen(exportSubtitlePopover, exportSubtitleBtn, false));
+}
+
+if (exportVideoBtn && exportVideoPopover) {
+  exportVideoBtn.addEventListener("click", () => {
+    const shouldOpen = exportVideoPopover.classList.contains("hidden");
+    closeToolbarPopovers(exportVideoPopover);
+    setToolbarPopoverOpen(exportVideoPopover, exportVideoBtn, shouldOpen);
+  });
+}
+
+if (closeExportVideoBtn) {
+  closeExportVideoBtn.addEventListener("click", () => setToolbarPopoverOpen(exportVideoPopover, exportVideoBtn, false));
+}
+
+if (chooseSubtitleTrackBtn && extraSubtitleFileInput) {
+  chooseSubtitleTrackBtn.addEventListener("click", () => {
     extraSubtitleFileInput.click();
   });
 }
+
+if (closeSubtitleTrackPanelBtn) {
+  closeSubtitleTrackPanelBtn.addEventListener("click", () => setSubtitleTrackPopoverOpen(false));
+}
+
+document.addEventListener("click", (event) => {
+  const popovers = [subtitleTrackPopover, exportSubtitlePopover, exportVideoPopover].filter(Boolean);
+  if (!popovers.some((popover) => !popover.classList.contains("hidden"))) {
+    return;
+  }
+  const target = event.target;
+  if (popovers.some((popover) => popover.contains(target))) {
+    return;
+  }
+  if (addSubtitleTrackBtn?.contains(target) || subtitleTrackCount?.contains(target) || exportSubtitleBtn?.contains(target) || exportVideoBtn?.contains(target)) {
+    return;
+  }
+  closeToolbarPopovers();
+});
 
 if (extraSubtitleFileInput) {
   extraSubtitleFileInput.addEventListener("change", async () => {
@@ -2563,6 +2779,7 @@ if (apiSettingsClose) {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setApiSettingsPanelOpen(false);
+    closeToolbarPopovers();
   }
 });
 
@@ -2629,6 +2846,7 @@ if (sourceSrtLink) {
     if (sourceSrtLink.classList.contains("disabled")) {
       return;
     }
+    closeToolbarPopovers();
     downloadCurrentSubtitle("source");
   });
 }
@@ -2639,6 +2857,7 @@ if (srtLink) {
     if (srtLink.classList.contains("disabled")) {
       return;
     }
+    closeToolbarPopovers();
     downloadCurrentSubtitle("translated");
   });
 }
@@ -2708,6 +2927,7 @@ if (voiceoverRenderBtn) {
 
 hardsubLink.addEventListener("click", async (event) => {
   event.preventDefault();
+  closeToolbarPopovers();
   try {
     await renderHardsubFromCurrentSubtitles();
   } catch (error) {
@@ -2718,6 +2938,7 @@ hardsubLink.addEventListener("click", async (event) => {
 if (softsubLink) {
   softsubLink.addEventListener("click", async (event) => {
     event.preventDefault();
+    closeToolbarPopovers();
     try {
       await renderSoftsubFromCurrentSubtitles();
     } catch (error) {
@@ -2728,6 +2949,7 @@ if (softsubLink) {
 
 voiceoverLink.addEventListener("click", async (event) => {
   event.preventDefault();
+  closeToolbarPopovers();
   try {
     await renderVoiceoverFromCurrentSubtitles();
   } catch (error) {
