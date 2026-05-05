@@ -813,11 +813,15 @@ body.subtitle-style-mode .canvas-control-group.subtitle-style-control {
   display: grid;
 }
 
+body.subtitle-style-mode .cover-box-control {
+  display: none;
+}
+
 body.subtitle-style-mode.cover-mode-blur .cover-blur-note {
   display: block;
 }
 
-body.subtitle-style-mode.cover-mode-box .cover-box-control {
+body.subtitle-style-mode.cover-mode-box .zoom-control.cover-box-control {
   display: grid;
 }
 
