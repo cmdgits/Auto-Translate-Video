@@ -1,5 +1,8 @@
 # Auto Translate Video
 
+
+![alt text](image.png)
+
 Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh phụ đề và xuất video hoàn chỉnh ngay trên máy tính cá nhân. Dự án hỗ trợ giao diện web kiểu trình dựng video, kèm CLI cho người muốn xử lý bằng dòng lệnh.
 
 Ứng dụng tập trung vào quy trình thực tế: tải video lên, nhận diện giọng nói, dịch phụ đề, chỉnh sửa trực tiếp trên timeline, làm mờ phụ đề gốc nếu cần, xuất video có phụ đề hoặc video thuyết minh tiếng Việt.
