@@ -901,8 +901,14 @@ class VideoTranslationPipeline:
             filter_script_path=context.voiceover_filter_path,
             ffmpeg_bin=self.config.ffmpeg_bin,
             render_config=self.config.render,
-            background_audio_gain=options.background_audio_gain or self.config.tts.background_audio_gain,
-            voiceover_gain=options.voiceover_gain or self.config.tts.voiceover_gain,
+            background_audio_gain=(
+                options.background_audio_gain
+                if options.background_audio_gain is not None
+                else self.config.tts.background_audio_gain
+            ),
+            voiceover_gain=(
+                options.voiceover_gain if options.voiceover_gain is not None else self.config.tts.voiceover_gain
+            ),
             has_original_audio=has_original_audio,
             duration_sec=duration_sec,
             progress_callback=lambda value: emit_voiceover_progress(0.45 + value * 0.2),

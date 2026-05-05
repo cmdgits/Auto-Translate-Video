@@ -53,7 +53,7 @@ tts:
   voice: vi-VN-HoaiMyNeural
   rate_floor: -35
   rate_ceil: 45
-  background_audio_gain: 0.24
+  background_audio_gain: 0.0
   voiceover_gain: 1.4
   speaker_voice_map:
     SPEAKER_00: vi-VN-NamMinhNeural

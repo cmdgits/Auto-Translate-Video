@@ -34,16 +34,21 @@ def mix_voiceover_audio(
 
     filter_lines: list[str] = []
     mix_inputs: list[str] = []
+    safe_background_gain = max(0.0, float(background_audio_gain))
+    safe_voiceover_gain = max(0.0, float(voiceover_gain))
 
-    if has_original_audio:
-        filter_lines.append(f"[0:a]volume={background_audio_gain:.3f},aresample=48000[bed]")
+    if has_original_audio and safe_background_gain > 0:
+        filter_lines.append(f"[0:a]volume={safe_background_gain:.3f},aresample=48000[bed]")
+        mix_inputs.append("[bed]")
+    elif duration_sec and duration_sec > 0:
+        filter_lines.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{duration_sec:.3f},asetpts=N/SR/TB[bed]")
         mix_inputs.append("[bed]")
 
     for index, clip in enumerate(clips, start=1):
         delay_ms = max(0, int(round(clip.start * 1000)))
         label = f"tts{index}"
         filter_lines.append(
-            f"[{index}:a]aresample=48000,adelay={delay_ms}:all=1,volume={voiceover_gain:.3f}[{label}]"
+            f"[{index}:a]aresample=48000,adelay={delay_ms}:all=1,volume={safe_voiceover_gain:.3f}[{label}]"
         )
         mix_inputs.append(f"[{label}]")
 

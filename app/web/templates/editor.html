@@ -60,7 +60,7 @@
             </label>
             <div class="time-grid compact-grid">
               <label class="field"><span>Âm lượng giọng</span><input id="voiceGainInput" name="voiceover_gain" type="number" step="0.05" value="1.4" /></label>
-              <label class="field"><span>Âm nền gốc</span><input id="bedGainInput" name="background_audio_gain" type="number" step="0.05" value="0.24" /></label>
+              <label class="field"><span>Âm gốc</span><input id="bedGainInput" name="background_audio_gain" type="number" step="0.05" value="0" title="Để 0 để tắt hoàn toàn tiếng video gốc khi xuất thuyết minh" /></label>
             </div>
           </section>
 
@@ -202,7 +202,7 @@
               <label class="zoom-control subtitle-style-control">
                 <span>Che chữ gốc</span>
                 <select id="subtitleCoverModeSelect" aria-label="Kiểu che chữ gốc">
-                  <option value="blur" selected>Làm mờ</option>
+                  <option value="blur" selected>Gaussian Blur</option>
                   <option value="box">Phủ màu</option>
                 </select>
                 <input id="subtitleCoverRange" type="range" min="0" max="100" step="5" value="72" />

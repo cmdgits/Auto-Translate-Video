@@ -34,9 +34,18 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
     cover_top = max(0.0, min(1.0 - subtitle_bottom_ratio - cover_height_ratio * 0.95, 1.0 - cover_height_ratio))
     cover_mode = str(render_config.subtitle_cover_mode or "blur").strip().lower()
     if cover_mode == "blur":
+        gaussian_sigma = max(6.0, min(32.0, 8.0 + cover_opacity * 26.0))
+        feather_px = max(8, min(48, round(float(render_config.subtitle_font_size) * 0.6)))
         return (
-            f"delogo=x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f}:"
-            f"w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:show=0"
+            f"split[base][blur_src];"
+            f"[blur_src]crop=w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:"
+            f"x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f},"
+            f"gblur=sigma={gaussian_sigma:.1f}:steps=2,format=rgba,"
+            f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"
+            f"a='255*{cover_opacity:.3f}*clip(min(min(X,W-1-X),min(Y,H-1-Y))/{feather_px},0,1)'"
+            f"[blurred_cover];"
+            f"[base][blurred_cover]overlay=x=W*{cover_left_ratio:.3f}:y=H*{cover_top:.3f}:"
+            f"format=yuv420:alpha=straight"
         )
 
     return (

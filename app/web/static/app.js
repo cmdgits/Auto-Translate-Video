@@ -762,7 +762,7 @@ function applySubtitleStyle(nextStyle = {}) {
   originalSubtitleCover.style.width = `${compactCoverWidth}%`;
   originalSubtitleCover.style.transform = "translateX(-50%)";
   originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "blur"
-    ? `blur(${Math.max(2, Math.round(state.subtitleStyle.coverOpacity / 14))}px)`
+    ? `blur(${Math.max(6, Math.round(state.subtitleStyle.coverOpacity / 6))}px)`
     : "none";
   originalSubtitleCover.style.background = state.subtitleStyle.coverMode === "blur"
     ? "rgba(255,255,255,0.015)"

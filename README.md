@@ -168,7 +168,7 @@ http://127.0.0.1:8001
 - Lưu phụ đề đã dịch ra file `.srt` sau khi chỉnh sửa.
 - Xuất video phụ đề để tạo file `.mp4` có phụ đề tiếng Việt được gắn vào video.
 - Xuất video softsub để tạo file `.mkv` chứa nhiều track phụ đề mềm, gồm phụ đề gốc và phụ đề tiếng Việt.
-- Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
+- Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa; mặc định tắt tiếng video gốc.
 - Khi xuất video, hệ thống tự ưu tiên GPU theo thứ tự `NVIDIA`, `Intel`, `AMD`; nếu FFmpeg hoặc máy không hỗ trợ GPU thì tự chuyển về CPU.
 - Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
 
@@ -272,7 +272,7 @@ Giọng đọc mặc định nằm trong `config.yaml`:
 tts:
   backend: edge-tts
   voice: vi-VN-HoaiMyNeural
-  background_audio_gain: 0.24
+  background_audio_gain: 0.0
   voiceover_gain: 1.4
   speaker_voice_map:
     SPEAKER_00: vi-VN-NamMinhNeural
@@ -284,7 +284,7 @@ Một số giọng tiếng Việt thường dùng:
 - `vi-VN-HoaiMyNeural`
 - `vi-VN-NamMinhNeural`
 
-Khi xuất video thuyết minh, hệ thống sẽ dùng nội dung phụ đề tiếng Việt hiện tại. Nếu bạn đã sửa phụ đề trên web, hãy lưu phụ đề trước khi render để video thuyết minh dùng đúng nội dung mới nhất.
+Khi xuất video thuyết minh, hệ thống sẽ dùng nội dung phụ đề tiếng Việt hiện tại. Nếu bạn đã sửa phụ đề trên web, hãy lưu phụ đề trước khi render để video thuyết minh dùng đúng nội dung mới nhất. Mặc định `background_audio_gain: 0.0` để tắt hoàn toàn tiếng video gốc, chỉ giữ giọng đọc thuyết minh.
 
 Nếu một đoạn phụ đề có chọn `Giọng đoạn này`, hệ thống sẽ ưu tiên giọng đó thay cho giọng mặc định. Trường `Speaker` giúp phân nhóm nhân vật khi chỉnh video nhiều người nói.
 

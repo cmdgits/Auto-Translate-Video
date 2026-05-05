@@ -889,7 +889,7 @@ body.resizing-canvas * {
 
 .original-subtitle-cover.blur-cover {
   background: rgba(255, 255, 255, 0.015);
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(12px);
   box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.05);
 }
 
