@@ -759,14 +759,16 @@ function applySubtitleStyle(nextStyle = {}) {
   originalSubtitleCover.style.height = `${state.subtitleStyle.coverHeight}%`;
   originalSubtitleCover.style.bottom = `${coverBottom}%`;
   originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "box"
-    ? String(state.subtitleStyle.coverOpacity / 100)
+    ? "1"
     : "0";
   originalSubtitleCover.style.left = `${coverCenter}%`;
   originalSubtitleCover.style.right = "auto";
   originalSubtitleCover.style.width = `${compactCoverWidth}%`;
   originalSubtitleCover.style.transform = "translateX(-50%)";
-  originalSubtitleCover.style.backdropFilter = "none";
-  originalSubtitleCover.style.background = state.subtitleStyle.coverMode === "box" ? "#000" : "transparent";
+  originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "box"
+    ? `blur(${Math.max(4, Math.round(state.subtitleStyle.coverOpacity / 8))}px)`
+    : "none";
+  originalSubtitleCover.style.background = "transparent";
   originalSubtitleCover.classList.toggle("blur-cover", state.subtitleStyle.coverMode === "blur");
   originalSubtitleCover.classList.toggle("box-cover", state.subtitleStyle.coverMode === "box");
   document.body.classList.toggle("cover-mode-none", state.subtitleStyle.coverMode === "none");
@@ -1150,7 +1152,7 @@ function coverRenderDescription() {
     return "Gaussian Blur OCR đang bật nên xuất sẽ lâu hơn.";
   }
   if (state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0) {
-    return "Phủ màu chữ gốc đang bật.";
+    return "Làm mờ vùng chữ gốc đang bật.";
   }
   return "Không che chữ gốc, xuất sẽ nhanh hơn.";
 }
@@ -2436,7 +2438,7 @@ async function renderSoftsubFromCurrentSubtitles() {
     state.subtitleStyle.coverMode === "blur"
       ? "Đang xuất MKV softsub có Gaussian Blur OCR, bước này sẽ lâu hơn vì cần render lại hình..."
       : coverEnabled
-      ? "Đang xuất MKV softsub có phủ màu chữ gốc..."
+      ? "Đang xuất MKV softsub có làm mờ vùng chữ gốc..."
       : "Đang xuất MKV softsub gồm nhiều track phụ đề...",
     "neutral",
   );
