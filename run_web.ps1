@@ -8,4 +8,5 @@ if (-not (Test-Path $python)) {
 }
 
 Set-Location $projectRoot
+$env:AUTOTRANSLATE_WORKER_BACKEND = "thread"
 & $python -m app.main web --host 127.0.0.1 --port 8001

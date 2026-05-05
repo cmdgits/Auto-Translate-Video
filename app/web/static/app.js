@@ -406,6 +406,17 @@ function setStatus(text, tone = "neutral") {
   statusPill.title = text;
 }
 
+function asrDeviceLabel(options = {}) {
+  const device = String(options.asr_device_used || "").toLowerCase();
+  if (device === "cuda") {
+    return "ASR: NVIDIA GPU";
+  }
+  if (device === "cpu") {
+    return "ASR: CPU";
+  }
+  return "ASR: auto";
+}
+
 function setMediaPanelCollapsed(collapsed, persist = true) {
   if (!appShell || !mediaPanelToggle) {
     return;
@@ -2041,7 +2052,7 @@ function applyJobState(job) {
     loadWaveform(job.job_id);
   }
 
-  languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"}`;
+  languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"} · ${asrDeviceLabel(job.options)}`;
   const jobPercent = Math.round((job.progress || 0) * 100);
   progressBadge.textContent = `${jobPercent}%`;
   updateRenderProgress(job);
@@ -2161,7 +2172,7 @@ function clearSelectedJob() {
   videoPreview.style.display = "none";
   emptyState.style.display = "grid";
   videoName.textContent = "Chưa chọn video";
-  languageBadge.textContent = "ngôn ngữ gốc: --";
+  languageBadge.textContent = "ngôn ngữ gốc: -- · ASR: auto";
   progressBadge.textContent = "0%";
   state.extraSubtitleTracks = [];
   updateRenderProgress(null);

@@ -30,7 +30,7 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Python `3.12` được khuyến nghị. Dự án hỗ trợ Python `>=3.11,<3.15`, nhưng không nên dùng Python `3.14` cho web UI trên Windows vì `faster-whisper`/`ctranslate2` có thể lỗi.
 - FFmpeg và FFprobe phải dùng được bằng lệnh `ffmpeg` và `ffprobe`, hoặc được cấu hình trong `config.yaml`.
 - Cần Internet nếu dùng dịch qua Gemini, OpenAI, LibreTranslate online hoặc tạo giọng đọc bằng `edge-tts`.
-- GPU NVIDIA là tùy chọn; nếu có, hệ thống có thể tự chọn `cuda` khi phù hợp.
+- GPU NVIDIA là tùy chọn; nếu có, hệ thống tự ưu tiên `cuda` cho nhận diện phụ đề ASR và tự fallback CPU nếu CUDA không dùng được.
 
 ## Cài Đặt Nhanh Trên Windows
 
@@ -143,7 +143,6 @@ http://127.0.0.1:8001
 - Xuất video softsub để tạo file `.mkv` chứa nhiều track phụ đề mềm, gồm phụ đề gốc và phụ đề tiếng Việt.
 - Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
 - Khi xuất video, hệ thống tự ưu tiên GPU theo thứ tự `NVIDIA`, `Intel`, `AMD`; nếu FFmpeg hoặc máy không hỗ trợ GPU thì tự chuyển về CPU.
-- Nếu chọn GPU nhưng máy không có driver/phần cứng tương ứng, FFmpeg sẽ báo lỗi; hãy chuyển về `CPU - ổn định`.
 - Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
 
 ## Chạy Worker Riêng

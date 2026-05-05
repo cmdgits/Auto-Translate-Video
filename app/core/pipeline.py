@@ -155,6 +155,14 @@ class VideoTranslationPipeline:
                 progress_hook=on_asr_progress,
             )
             timings["asr_sec"] = round(time.perf_counter() - asr_started, 3)
+            manifest_options = {
+                **(manifest.options or {}),
+                "asr_device_used": asr_backend.selected_device or "unknown",
+                "asr_compute_type_used": asr_backend.selected_compute_type or "unknown",
+            }
+            manifest = manifest.model_copy(update={"options": manifest_options})
+            if asr_backend.warnings:
+                manifest = manifest.model_copy(update={"errors": [*(manifest.errors or []), *asr_backend.warnings]})
             self._raise_if_cancelled(context)
             self._write_transcript_json(transcript, context.transcript_json_path)
             manifest = manifest.model_copy(update={"outputs": self._collect_existing_outputs(context)})

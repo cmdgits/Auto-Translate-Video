@@ -13,6 +13,9 @@ datas = [
     (str(project_root / "app" / "web" / "static"), "app/web/static"),
     (str(project_root / "config.example.yaml"), "."),
 ]
+bundled_tiny_model = project_root / "models" / "faster-whisper-tiny"
+if bundled_tiny_model.exists():
+    datas.append((str(bundled_tiny_model), "models/faster-whisper-tiny"))
 datas += collect_data_files("faster_whisper", includes=["assets/*"])
 
 binaries = []

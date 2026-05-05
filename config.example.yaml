@@ -8,6 +8,7 @@ directories:
 asr:
   backend: faster-whisper
   model_size: tiny
+  # auto: ưu tiên NVIDIA/CUDA cho nhận diện phụ đề, lỗi GPU sẽ tự fallback CPU.
   device: auto
   compute_type: auto
   beam_size: 1

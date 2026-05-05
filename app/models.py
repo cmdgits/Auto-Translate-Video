@@ -110,6 +110,8 @@ def sanitize_pipeline_options(options: PipelineRunOptions | dict[str, object]) -
                 }
                 for track in value
             ]
+        elif key in {"asr_device_used", "asr_compute_type_used"}:
+            sanitized[key] = str(value)
         else:
             sanitized[key] = value
     return sanitized

@@ -10,6 +10,9 @@ dist/
 dist_fixed/
 dist_exe_fixed/
 dist_auto_gpu/
+dist_asr_auto_gpu/
+dist_stable_asr_render/
+dist_exe_no_48_hang/
 workspace_data/
 # Bỏ qua các bộ cài đặt và file nén
 OllamaSetup.exe
