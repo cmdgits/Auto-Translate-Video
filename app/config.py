@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.example.yaml"
 LOCAL_CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 CONFIG_ENV_VAR = "AUTOTRANSLATE_CONFIG"
+WORKER_BACKEND_ENV_VAR = "AUTOTRANSLATE_WORKER_BACKEND"
 
 
 def _resolve_path(value: str | Path) -> Path:
@@ -108,7 +109,7 @@ class SubtitleConfig(BaseModel):
 class RenderConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    encoder: str = "cpu"
+    encoder: str = "auto"
     quality_preset: str = "balanced"
     video_codec: str = "libx264"
     preset: str = "medium"
@@ -180,10 +181,15 @@ class AppConfig(BaseModel):
                 "worker": data.get("worker", {}),
             }
         )
+        worker_backend_override = os.getenv(WORKER_BACKEND_ENV_VAR)
+        worker_config = config.worker
+        if worker_backend_override:
+            worker_config = worker_config.model_copy(update={"backend": worker_backend_override.strip().lower()})
         return config.model_copy(
             update={
                 "directories": config.directories.resolve(),
                 "ffmpeg_bin": _resolve_binary(config.ffmpeg_bin),
                 "ffprobe_bin": _resolve_binary(config.ffprobe_bin),
+                "worker": worker_config,
             }
         )

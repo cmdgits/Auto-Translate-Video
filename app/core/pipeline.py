@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Callable
@@ -9,7 +10,7 @@ from typing import Callable
 from app.asr.faster_whisper_backend import FasterWhisperBackend
 from app.config import AppConfig
 from app.config import RenderConfig
-from app.core.exceptions import ConfigurationError, JobCancelledError, ProcessError
+from app.core.exceptions import ConfigurationError, DependencyError, JobCancelledError, ProcessError
 from app.core.jobs import JobContext, JobManager
 from app.media.audio_extract import extract_audio_to_wav
 from app.media.probe import probe_video
@@ -52,6 +53,7 @@ class VideoTranslationPipeline:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.jobs = JobManager(config.directories.jobs_dir)
+        self._detected_render_encoders: list[str] | None = None
 
     def cancel_job(self, job_id: str, reason: str = "Tác vụ đã được dừng theo yêu cầu.") -> JobManifest:
         context, manifest = self._require_job(job_id)
@@ -641,14 +643,17 @@ class VideoTranslationPipeline:
                 bottom_percent=options.subtitle_position_y or 8,
             )
         duration_sec = self._duration_for_context(context)
-        return burn_subtitles_into_video(
-            context.input_video,
-            subtitle_path,
-            context.hardsub_video_path,
-            self.config.ffmpeg_bin,
-            self._render_config_for_options(options),
-            duration_sec=duration_sec,
-            progress_callback=progress_callback,
+        return self._run_video_render_with_auto_encoder(
+            lambda render_config: burn_subtitles_into_video(
+                context.input_video,
+                subtitle_path,
+                context.hardsub_video_path,
+                self.config.ffmpeg_bin,
+                render_config,
+                duration_sec=duration_sec,
+                progress_callback=progress_callback,
+            ),
+            options,
         )
 
     def _render_softsub_output(
@@ -664,29 +669,35 @@ class VideoTranslationPipeline:
             (context.srt_path, "vie", "Phụ đề tiếng Việt"),
             (context.original_srt_path, "und", "Phụ đề gốc"),
         ]
-        render_config = self._render_config_for_options(options)
         extra_tracks, default_subtitle_index = self._write_extra_subtitle_tracks(context, options, len(subtitle_tracks))
         subtitle_tracks.extend(extra_tracks)
-        context.softsub_command_path.write_text(
-            build_mux_subtitle_tracks_command_string(
+
+        def render_softsub_with_config(active_render_config: RenderConfig) -> Path:
+            context.softsub_command_path.write_text(
+                build_mux_subtitle_tracks_command_string(
+                    context.input_video,
+                    subtitle_tracks,
+                    context.softsub_video_path,
+                    self.config.ffmpeg_bin,
+                    active_render_config,
+                    default_subtitle_index=default_subtitle_index,
+                ),
+                encoding="utf-8",
+            )
+            return mux_subtitle_tracks_into_video(
                 context.input_video,
                 subtitle_tracks,
                 context.softsub_video_path,
                 self.config.ffmpeg_bin,
-                render_config,
+                active_render_config,
+                duration_sec=duration_sec,
+                progress_callback=progress_callback,
                 default_subtitle_index=default_subtitle_index,
-            ),
-            encoding="utf-8",
-        )
-        return mux_subtitle_tracks_into_video(
-            context.input_video,
-            subtitle_tracks,
-            context.softsub_video_path,
-            self.config.ffmpeg_bin,
-            render_config,
-            duration_sec=duration_sec,
-            progress_callback=progress_callback,
-            default_subtitle_index=default_subtitle_index,
+            )
+
+        return self._run_video_render_with_auto_encoder(
+            render_softsub_with_config,
+            options,
         )
 
     def _write_extra_subtitle_tracks(
@@ -724,11 +735,13 @@ class VideoTranslationPipeline:
                 has_extra_default = True
         return subtitle_tracks, default_subtitle_index
 
-    def _render_config_for_options(self, options: PipelineRunOptions | None = None) -> RenderConfig:
-        updates = self._render_encoder_updates(
-            encoder=options.render_encoder if options else None,
-            preset=options.render_preset if options else None,
-        )
+    def _render_config_for_options(
+        self,
+        options: PipelineRunOptions | None = None,
+        encoder: str | None = None,
+        preset: str | None = None,
+    ) -> RenderConfig:
+        updates = self._render_encoder_updates(encoder=encoder, preset=preset)
         if not options:
             return self.config.render.model_copy(update=updates) if updates else self.config.render
         if options.subtitle_cover_mode:
@@ -740,8 +753,79 @@ class VideoTranslationPipeline:
             updates["subtitle_cover_height_ratio"] = max(0.05, min(0.45, float(options.subtitle_cover_height_ratio)))
         return self.config.render.model_copy(update=updates) if updates else self.config.render
 
+    def _candidate_render_encoder_names(self, requested_encoder: str | None = None) -> list[str]:
+        selected = (requested_encoder or self.config.render.encoder or "auto").strip().lower()
+        if selected in {"nvidia", "intel", "amd", "cpu"}:
+            return [selected] if selected == "cpu" else [selected, "cpu"]
+        detected_encoders = self._detect_render_encoder_names()
+        if detected_encoders:
+            return [*detected_encoders, "cpu"]
+        return ["cpu"]
+
+    def _detect_render_encoder_names(self) -> list[str]:
+        if self._detected_render_encoders is not None:
+            return self._detected_render_encoders
+        detected: list[str] = []
+        gpu_text = self._read_windows_gpu_names().lower()
+        if "nvidia" in gpu_text or "geforce" in gpu_text or "quadro" in gpu_text or "rtx" in gpu_text or "gtx" in gpu_text:
+            detected.append("nvidia")
+        if "intel" in gpu_text or "iris" in gpu_text or "arc" in gpu_text or "uhd graphics" in gpu_text:
+            detected.append("intel")
+        if "amd" in gpu_text or "radeon" in gpu_text:
+            detected.append("amd")
+        self._detected_render_encoders = detected
+        return detected
+
+    def _read_windows_gpu_names(self) -> str:
+        command = [
+            "powershell.exe",
+            "-NoProfile",
+            "-Command",
+            "(Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name) -join [Environment]::NewLine",
+        ]
+        try:
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=3, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+        if completed.returncode != 0:
+            return ""
+        return completed.stdout or ""
+
+    def _run_video_render_with_auto_encoder(
+        self,
+        renderer: Callable[[RenderConfig], Path],
+        options: PipelineRunOptions | None = None,
+        base_render_config: RenderConfig | None = None,
+    ) -> Path:
+        requested_encoder = options.render_encoder if options and options.render_encoder else None
+        requested_preset = options.render_preset if options and options.render_preset else None
+        errors: list[str] = []
+        for encoder in self._candidate_render_encoder_names(requested_encoder):
+            active_config = self._render_config_for_options(options, encoder=encoder, preset=requested_preset)
+            if base_render_config:
+                active_config = base_render_config.model_copy(
+                    update={
+                        "encoder": active_config.encoder,
+                        "quality_preset": active_config.quality_preset,
+                        "video_codec": active_config.video_codec,
+                        "preset": active_config.preset,
+                        "crf": active_config.crf,
+                    }
+                )
+            try:
+                return renderer(active_config)
+            except DependencyError:
+                raise
+            except ProcessError as exc:
+                if encoder == "cpu" or requested_encoder:
+                    if errors:
+                        raise ProcessError("\n\n".join([*errors, str(exc)])) from exc
+                    raise
+                errors.append(f"Không dùng được {encoder.upper()} GPU, tự chuyển sang encoder khác. Chi tiết: {exc}")
+        raise ProcessError("Không xuất được video bằng GPU hoặc CPU.")
+
     def _render_encoder_updates(self, encoder: str | None = None, preset: str | None = None) -> dict[str, object]:
-        selected_encoder = (encoder or self.config.render.encoder or "cpu").strip().lower()
+        selected_encoder = (encoder or "cpu").strip().lower()
         selected_preset = (preset or self.config.render.quality_preset or "balanced").strip().lower()
         selected_encoder = selected_encoder if selected_encoder in {"cpu", "nvidia", "intel", "amd"} else "cpu"
         selected_preset = selected_preset if selected_preset in {"fast", "balanced", "quality"} else "balanced"

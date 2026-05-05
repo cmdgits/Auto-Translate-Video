@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 project_root = Path.cwd()
 
 datas = [
@@ -11,6 +13,7 @@ datas = [
     (str(project_root / "app" / "web" / "static"), "app/web/static"),
     (str(project_root / "config.example.yaml"), "."),
 ]
+datas += collect_data_files("faster_whisper", includes=["assets/*"])
 
 binaries = []
 ffmpeg_dir = project_root / "tools" / "ffmpeg" / "bin"
@@ -29,6 +32,7 @@ hiddenimports = [
     "app.translate.libretranslate_backend",
     "app.translate.mymemory_backend",
     "app.tts.edge_tts_backend",
+    "faster_whisper.assets",
 ]
 
 a = Analysis(

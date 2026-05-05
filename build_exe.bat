@@ -2,6 +2,16 @@
 setlocal
 cd /d "%~dp0"
 
+tasklist /FI "IMAGENAME eq AutoTranslateVideo.exe" 2>NUL | find /I "AutoTranslateVideo.exe" >NUL
+if not errorlevel 1 (
+  echo Dang co AutoTranslateVideo.exe dang chay nen khong the ghi de thu muc dist.
+  echo Hay tat cua so AutoTranslateVideo.exe cu roi chay lai build_exe.bat.
+  echo Neu can dung ngay ban moi, hay mo dist_fixed\AutoTranslateVideo\AutoTranslateVideo.exe.
+  echo.
+  pause
+  exit /b 1
+)
+
 set "PYTHON_EXE=%~dp0tools\Python312\python.exe"
 if not exist "%PYTHON_EXE%" set "PYTHON_EXE=python"
 

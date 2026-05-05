@@ -103,9 +103,6 @@ const toast = document.getElementById("toast");
 const voiceNameInput = document.getElementById("voiceNameInput");
 const voiceGainInput = document.getElementById("voiceGainInput");
 const bedGainInput = document.getElementById("bedGainInput");
-const renderEncoderSelect = document.getElementById("renderEncoderSelect");
-const renderPresetSelect = document.getElementById("renderPresetSelect");
-const renderPresetHint = document.getElementById("renderPresetHint");
 
 const MIN_SEGMENT_DURATION = 0.2;
 const DEFAULT_TIMELINE_PIXELS_PER_SECOND = 72;
@@ -119,7 +116,6 @@ const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
 const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
-const RENDER_SETTINGS_STORAGE_KEY = "autoTranslateVideo.renderSettings.v1";
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
 const EXTRA_SUBTITLE_TRACKS_STORAGE_PREFIX = "autoTranslateVideo.extraSubtitleTracks.v1";
@@ -279,10 +275,6 @@ const state = {
     coverMode: "blur",
     coverOpacity: 72,
     coverHeight: 18,
-  },
-  renderSettings: {
-    encoder: "cpu",
-    preset: "balanced",
   },
   previewMode: "source",
   previewSourceMode: "source",
@@ -798,69 +790,11 @@ function subtitleStylePayload() {
   };
 }
 
-function renderSettingsPayload() {
-  return {
-    render_encoder: state.renderSettings.encoder,
-    render_preset: state.renderSettings.preset,
-  };
-}
-
 function renderPayload(extra = {}) {
   return {
     ...subtitleStylePayload(),
-    ...renderSettingsPayload(),
     ...extra,
   };
-}
-
-function renderPresetHintText() {
-  const encoderLabels = {
-    cpu: "CPU",
-    nvidia: "NVIDIA GPU",
-    intel: "Intel GPU",
-    amd: "AMD GPU",
-  };
-  const presetLabels = {
-    fast: "nhanh hơn, file nhỏ hơn nhưng chất lượng giảm nhẹ",
-    balanced: "cân bằng tốc độ và chất lượng",
-    quality: "chất lượng cao, xuất lâu hơn và file lớn hơn",
-  };
-  return `${encoderLabels[state.renderSettings.encoder] || "CPU"}: ${presetLabels[state.renderSettings.preset] || presetLabels.balanced}.`;
-}
-
-function applyRenderSettings(nextSettings = {}) {
-  const encoder = ["cpu", "nvidia", "intel", "amd"].includes(nextSettings.encoder)
-    ? nextSettings.encoder
-    : state.renderSettings.encoder;
-  const preset = ["fast", "balanced", "quality"].includes(nextSettings.preset)
-    ? nextSettings.preset
-    : state.renderSettings.preset;
-  state.renderSettings = { encoder, preset };
-  if (renderEncoderSelect) {
-    renderEncoderSelect.value = encoder;
-  }
-  if (renderPresetSelect) {
-    renderPresetSelect.value = preset;
-  }
-  if (renderPresetHint) {
-    renderPresetHint.textContent = renderPresetHintText();
-  }
-}
-
-function persistRenderSettings() {
-  try {
-    window.localStorage.setItem(RENDER_SETTINGS_STORAGE_KEY, JSON.stringify(state.renderSettings));
-  } catch (error) {
-  }
-}
-
-function loadRenderSettings() {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(RENDER_SETTINGS_STORAGE_KEY) || "{}");
-    applyRenderSettings(saved);
-  } catch (error) {
-    applyRenderSettings();
-  }
 }
 
 function extraSubtitleTracksStorageKey(jobId = state.jobId) {
@@ -1271,12 +1205,6 @@ function appendApiSettings(payload) {
 
 function appendSubtitleStyle(payload) {
   Object.entries(subtitleStylePayload()).forEach(([key, value]) => {
-    payload.set(key, String(value));
-  });
-}
-
-function appendRenderSettings(payload) {
-  Object.entries(renderSettingsPayload()).forEach(([key, value]) => {
     payload.set(key, String(value));
   });
 }
@@ -2933,7 +2861,6 @@ form.addEventListener("submit", async (event) => {
   const payload = new FormData(form);
   appendApiSettings(payload);
   appendSubtitleStyle(payload);
-  appendRenderSettings(payload);
   const endpoint = files.length === 1 ? "/api/jobs" : "/api/jobs/batch";
   if (files.length > 1) {
     payload.delete("file");
@@ -3126,20 +3053,6 @@ if (voiceoverRenderBtn) {
     } catch (error) {
       setStatus(userMessage(error.message), "error");
     }
-  });
-}
-
-if (renderEncoderSelect) {
-  renderEncoderSelect.addEventListener("change", () => {
-    applyRenderSettings({ encoder: renderEncoderSelect.value, preset: state.renderSettings.preset });
-    persistRenderSettings();
-  });
-}
-
-if (renderPresetSelect) {
-  renderPresetSelect.addEventListener("change", () => {
-    applyRenderSettings({ encoder: state.renderSettings.encoder, preset: renderPresetSelect.value });
-    persistRenderSettings();
   });
 }
 
@@ -3459,7 +3372,6 @@ clearSelectedJob();
 loadMediaPanelState();
 applyVideoZoom();
 loadSubtitleStyle();
-loadRenderSettings();
 applyTimelineZoom(DEFAULT_TIMELINE_PIXELS_PER_SECOND, false);
 loadApiSettings();
 pollJobs();

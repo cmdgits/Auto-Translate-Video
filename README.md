@@ -142,7 +142,7 @@ http://127.0.0.1:8001
 - Xuất video phụ đề để tạo file `.mp4` có phụ đề tiếng Việt được gắn vào video.
 - Xuất video softsub để tạo file `.mkv` chứa nhiều track phụ đề mềm, gồm phụ đề gốc và phụ đề tiếng Việt.
 - Xuất video thuyết minh để tạo file `.mp4` có giọng đọc tiếng Việt dựa trên phụ đề đã dịch hoặc đã sửa.
-- Trong mục Xuất video, có thể chọn bộ mã hoá `CPU`, `NVIDIA GPU`, `Intel GPU`, `AMD GPU` và preset `Nhanh`, `Cân bằng`, `Chất lượng cao`.
+- Khi xuất video, hệ thống tự ưu tiên GPU theo thứ tự `NVIDIA`, `Intel`, `AMD`; nếu FFmpeg hoặc máy không hỗ trợ GPU thì tự chuyển về CPU.
 - Nếu chọn GPU nhưng máy không có driver/phần cứng tương ứng, FFmpeg sẽ báo lỗi; hãy chuyển về `CPU - ổn định`.
 - Khi xuất, giao diện hiển thị phần trăm tiến trình để biết tác vụ đang chạy tới đâu.
 

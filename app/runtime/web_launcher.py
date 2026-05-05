@@ -4,6 +4,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
+from socket import socket
 
 import uvicorn
 
@@ -40,17 +41,25 @@ def add_bundled_ffmpeg_to_path() -> None:
             break
 
 
+def choose_available_port(host: str, preferred_port: int) -> int:
+    for port in range(preferred_port, preferred_port + 20):
+        with socket() as probe:
+            if probe.connect_ex((host, port)) != 0:
+                return port
+    return preferred_port
+
+
 def main() -> None:
     import multiprocessing
+    import os
 
     multiprocessing.freeze_support()
     host = "127.0.0.1"
-    port = 8001
+    port = choose_available_port(host, 8001)
     add_bundled_ffmpeg_to_path()
+    os.environ.setdefault("AUTOTRANSLATE_WORKER_BACKEND", "thread")
     config_path = bundled_config_path()
     if config_path:
-        import os
-
         os.environ.setdefault("AUTOTRANSLATE_CONFIG", str(config_path))
     threading.Timer(1.2, lambda: webbrowser.open(f"http://{host}:{port}/")).start()
     uvicorn.run("app.web.main:app", host=host, port=port, reload=False, factory=False)

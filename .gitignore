@@ -7,6 +7,9 @@ config.yaml
 *.egg-info/
 build/
 dist/
+dist_fixed/
+dist_exe_fixed/
+dist_auto_gpu/
 workspace_data/
 # Bỏ qua các bộ cài đặt và file nén
 OllamaSetup.exe
