@@ -120,16 +120,16 @@ class RenderConfig(BaseModel):
     subtitle_cover_mode: str = "blur"
     subtitle_cover_height_ratio: float = 0.07
     subtitle_cover_width_ratio: float = 0.86
-    subtitle_cover_opacity: float = 0.72
+    subtitle_cover_opacity: float = 0.9
     subtitle_font_size: float = 32
     subtitle_position_x: float = 50
     subtitle_position_y: float = 8
     ocr_backend: str = "tesseract"
     ocr_languages: str = "eng+chi_sim+chi_tra"
-    ocr_min_confidence: float = 45.0
-    ocr_box_padding: int = 8
-    ocr_blur_kernel_size: int = 51
-    ocr_frame_interval: int = 20
+    ocr_min_confidence: float = 55.0
+    ocr_box_padding: int = 14
+    ocr_blur_kernel_size: int = 75
+    ocr_frame_interval: int = 8
     ocr_scan_region: str = "subtitle"
     ocr_tesseract_config: str = "--psm 11"
 

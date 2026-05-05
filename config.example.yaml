@@ -48,13 +48,13 @@ render:
   subtitle_cover_mode: blur
   subtitle_cover_height_ratio: 0.07
   subtitle_cover_width_ratio: 0.86
-  subtitle_cover_opacity: 0.72
+  subtitle_cover_opacity: 0.9
   ocr_backend: tesseract
   ocr_languages: eng+chi_sim+chi_tra
-  ocr_min_confidence: 45.0
-  ocr_box_padding: 8
-  ocr_blur_kernel_size: 51
-  ocr_frame_interval: 20
+  ocr_min_confidence: 55.0
+  ocr_box_padding: 14
+  ocr_blur_kernel_size: 75
+  ocr_frame_interval: 8
   ocr_scan_region: subtitle
   ocr_tesseract_config: --psm 11
 tts:
