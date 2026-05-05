@@ -758,7 +758,13 @@ class VideoTranslationPipeline:
             updates["cover_original_subtitles"] = options.subtitle_cover_opacity > 0
             updates["subtitle_cover_opacity"] = max(0.0, min(1.0, float(options.subtitle_cover_opacity)))
         if options.subtitle_cover_height_ratio is not None:
-            updates["subtitle_cover_height_ratio"] = max(0.05, min(0.45, float(options.subtitle_cover_height_ratio)))
+            updates["subtitle_cover_height_ratio"] = max(0.04, min(0.24, float(options.subtitle_cover_height_ratio)))
+        if options.subtitle_font_size is not None:
+            updates["subtitle_font_size"] = max(8.0, min(64.0, float(options.subtitle_font_size)))
+        if options.subtitle_position_x is not None:
+            updates["subtitle_position_x"] = max(10.0, min(90.0, float(options.subtitle_position_x)))
+        if options.subtitle_position_y is not None:
+            updates["subtitle_position_y"] = max(3.0, min(45.0, float(options.subtitle_position_y)))
         return self.config.render.model_copy(update=updates) if updates else self.config.render
 
     def _candidate_render_encoder_names(self, requested_encoder: str | None = None) -> list[str]:

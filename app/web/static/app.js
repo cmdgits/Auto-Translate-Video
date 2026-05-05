@@ -274,7 +274,7 @@ const state = {
     y: 8,
     coverMode: "blur",
     coverOpacity: 72,
-    coverHeight: 18,
+    coverHeight: 10,
   },
   previewMode: "source",
   previewSourceMode: "source",
@@ -735,7 +735,7 @@ function applySubtitleStyle(nextStyle = {}) {
     y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 3, 45, 8),
     coverMode: coverMode || "blur",
     coverOpacity: clampNumber(nextStyle.coverOpacity ?? state.subtitleStyle.coverOpacity, 0, 100, 72),
-    coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 8, 35, 18),
+    coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 4, 24, 10),
   };
   applySubtitleOverlayScale();
   subtitleOverlay.style.left = `${state.subtitleStyle.x}%`;
@@ -744,21 +744,23 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleOverlay.style.transform = "translateX(-50%)";
   subtitleOverlay.style.width = "max-content";
   subtitleOverlay.style.maxWidth = "84%";
-  const blurCoverWidth = 76;
-  const blurCoverCenter = clampNumber(
+  const compactCoverWidth = clampNumber(state.subtitleStyle.size * 1.08, 32, 74, 48);
+  const coverCenter = clampNumber(
     state.subtitleStyle.x,
-    blurCoverWidth / 2,
-    100 - blurCoverWidth / 2,
+    compactCoverWidth / 2,
+    100 - compactCoverWidth / 2,
     50,
   );
+  const coverBottom = Math.max(0, state.subtitleStyle.y - state.subtitleStyle.coverHeight * 0.08);
   originalSubtitleCover.style.height = `${state.subtitleStyle.coverHeight}%`;
+  originalSubtitleCover.style.bottom = `${coverBottom}%`;
   originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "blur"
     ? "1"
     : String(state.subtitleStyle.coverOpacity / 100);
-  originalSubtitleCover.style.left = state.subtitleStyle.coverMode === "blur" ? `${blurCoverCenter}%` : "0";
-  originalSubtitleCover.style.right = state.subtitleStyle.coverMode === "blur" ? "auto" : "0";
-  originalSubtitleCover.style.width = state.subtitleStyle.coverMode === "blur" ? `${blurCoverWidth}%` : "auto";
-  originalSubtitleCover.style.transform = state.subtitleStyle.coverMode === "blur" ? "translateX(-50%)" : "none";
+  originalSubtitleCover.style.left = `${coverCenter}%`;
+  originalSubtitleCover.style.right = "auto";
+  originalSubtitleCover.style.width = `${compactCoverWidth}%`;
+  originalSubtitleCover.style.transform = "translateX(-50%)";
   originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "blur"
     ? `blur(${Math.max(2, Math.round(state.subtitleStyle.coverOpacity / 8))}px)`
     : "none";

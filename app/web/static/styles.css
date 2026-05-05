@@ -874,14 +874,16 @@ body.resizing-canvas * {
 
 .original-subtitle-cover {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
+  right: auto;
   bottom: 0;
-  height: 18%;
+  width: 48%;
+  height: 10%;
   background: #000;
   opacity: 0.72;
   border-radius: 14px;
   pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .original-subtitle-cover.blur-cover {

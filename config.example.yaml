@@ -46,7 +46,7 @@ render:
   audio_bitrate: 192k
   cover_original_subtitles: true
   subtitle_cover_mode: blur
-  subtitle_cover_height_ratio: 0.18
+  subtitle_cover_height_ratio: 0.10
   subtitle_cover_opacity: 0.72
 tts:
   backend: edge-tts
