@@ -132,7 +132,7 @@ class TTSConfig(BaseModel):
     voice: str = "vi-VN-HoaiMyNeural"
     rate_floor: int = -35
     rate_ceil: int = 45
-    background_audio_gain: float = 0.0
+    background_audio_gain: float = 0.24
     voiceover_gain: float = 1.4
     max_concurrency: int = 3
     speaker_voice_map: dict[str, str] = Field(default_factory=dict)

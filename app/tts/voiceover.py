@@ -33,16 +33,9 @@ def mix_voiceover_audio(
         command.extend(["-i", str(clip.path)])
 
     filter_lines: list[str] = []
-    mix_inputs: list[str] = []
+    voice_inputs: list[str] = []
     safe_background_gain = max(0.0, float(background_audio_gain))
     safe_voiceover_gain = max(0.0, float(voiceover_gain))
-
-    if has_original_audio and safe_background_gain > 0:
-        filter_lines.append(f"[0:a]volume={safe_background_gain:.3f},aresample=48000[bed]")
-        mix_inputs.append("[bed]")
-    elif duration_sec and duration_sec > 0:
-        filter_lines.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{duration_sec:.3f},asetpts=N/SR/TB[bed]")
-        mix_inputs.append("[bed]")
 
     for index, clip in enumerate(clips, start=1):
         delay_ms = max(0, int(round(clip.start * 1000)))
@@ -50,15 +43,37 @@ def mix_voiceover_audio(
         filter_lines.append(
             f"[{index}:a]aresample=48000,adelay={delay_ms}:all=1,volume={safe_voiceover_gain:.3f}[{label}]"
         )
-        mix_inputs.append(f"[{label}]")
+        voice_inputs.append(f"[{label}]")
 
-    if not mix_inputs:
+    if not voice_inputs:
         raise ProcessError("Khong tao duoc mix input cho voice-over.")
 
-    filter_lines.append(
-        "".join(mix_inputs)
-        + f"amix=inputs={len(mix_inputs)}:normalize=0:dropout_transition=0[aout]"
-    )
+    if len(voice_inputs) == 1:
+        filter_lines.append(f"{voice_inputs[0]}anull[voice_raw]")
+    else:
+        filter_lines.append(
+            "".join(voice_inputs)
+            + f"amix=inputs={len(voice_inputs)}:duration=longest:normalize=0:dropout_transition=0[voice_raw]"
+        )
+
+    if has_original_audio and safe_background_gain > 0:
+        filter_lines.append(f"[0:a]aresample=48000,volume={safe_background_gain:.3f}[bed_raw]")
+        filter_lines.append("[voice_raw]asplit[voice_side][voice_mix]")
+        filter_lines.append(
+            "[bed_raw][voice_side]"
+            "sidechaincompress=threshold=0.030:ratio=12:attack=20:release=360:"
+            "knee=2.5:link=maximum:detection=rms[bed_ducked]"
+        )
+        filter_lines.append(
+            "[bed_ducked][voice_mix]amix=inputs=2:duration=longest:normalize=0:dropout_transition=0[aout]"
+        )
+    elif duration_sec and duration_sec > 0:
+        filter_lines.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{duration_sec:.3f},asetpts=N/SR/TB[bed]")
+        filter_lines.append(
+            "[bed][voice_raw]amix=inputs=2:duration=longest:normalize=0:dropout_transition=0[aout]"
+        )
+    else:
+        filter_lines.append("[voice_raw]anull[aout]")
     filter_script_path.write_text(";\n".join(filter_lines) + "\n", encoding="utf-8")
 
     command.extend(
