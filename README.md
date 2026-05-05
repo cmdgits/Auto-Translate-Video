@@ -34,6 +34,31 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 
 ## Cài Đặt Nhanh Trên Windows
 
+### Cách Dễ Nhất: Cài Portable Bằng File BAT
+
+Nếu muốn dùng nhanh hoặc chuyển cả dự án sang máy khác, hãy chạy file sau ở thư mục gốc dự án:
+
+```text
+install_all.bat
+```
+
+File này sẽ tự chuẩn bị các phần cần thiết:
+
+- Tải và cài Python portable vào `tools\Python312` nếu máy chưa có.
+- Cài toàn bộ thư viện Python của dự án.
+- Tải và giải nén FFmpeg portable vào `tools\ffmpeg` nếu chưa có.
+- Tạo `config.yaml`, `.env` và các thư mục dữ liệu trong `workspace_data`.
+- Cấu hình worker mặc định là `thread` để chạy được bằng `run_web.bat` mà không bắt buộc Redis/Celery.
+- Tải model `faster-whisper-tiny` vào `models\faster-whisper-tiny` nếu có Internet, giúp lần tạo tác vụ đầu tiên ít bị chờ tải model.
+
+Sau khi cài xong, chạy ứng dụng bằng:
+
+```text
+run_web.bat
+```
+
+Khi muốn chuyển sang máy khác, copy cả thư mục `Auto-Translate-Video` sang máy mới rồi chạy lại `install_all.bat` nếu máy đó còn thiếu Python, FFmpeg hoặc thư viện.
+
 ### 1. Tải mã nguồn
 
 ```powershell

@@ -9,4 +9,8 @@ if (-not (Test-Path $python)) {
 
 Set-Location $projectRoot
 $env:AUTOTRANSLATE_WORKER_BACKEND = "thread"
+$ffmpegBin = Join-Path $projectRoot "tools\ffmpeg\bin"
+if (Test-Path (Join-Path $ffmpegBin "ffmpeg.exe")) {
+  $env:PATH = "$ffmpegBin;$env:PATH"
+}
 & $python -m app.main web --host 127.0.0.1 --port 8001
