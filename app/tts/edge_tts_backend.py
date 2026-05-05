@@ -90,14 +90,20 @@ class EdgeTTSBackend:
 
         output_dir.mkdir(parents=True, exist_ok=True)
         self.warnings = []
-        clips: list[VoiceClip] = []
+        clips_by_index: dict[int, VoiceClip] = {}
         total_segments = max(len(segments), 1)
-        for index, segment in enumerate(segments, start=1):
+        completed_segments = 0
+        concurrency = max(1, min(int(self.config.max_concurrency or 1), 6))
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def synthesize_one(index: int, segment: TranscriptSegment) -> None:
+            nonlocal completed_segments
             spoken_text = sanitize_tts_text(segment.subtitle_text or segment.translated_text or segment.text)
             if not spoken_text:
+                completed_segments += 1
                 if progress_callback:
-                    progress_callback(index / total_segments)
-                continue
+                    progress_callback(completed_segments / total_segments)
+                return
             speaker_key = (segment.speaker or "").strip()
             mapped_voice_name = self.config.speaker_voice_map.get(speaker_key) if speaker_key else None
             segment_voice_name = (segment.voice_name or mapped_voice_name or self.voice_name).strip()
@@ -112,13 +118,15 @@ class EdgeTTSBackend:
             clip_path = output_dir / f"segment_{segment.id:04d}_{clip_signature}.mp3"
             if not clip_path.exists() or clip_path.stat().st_size <= 0:
                 try:
-                    await self._save_clip(edge_tts, spoken_text, clip_path, rate_value, segment_voice_name)
+                    async with semaphore:
+                        await self._save_clip(edge_tts, spoken_text, clip_path, rate_value, segment_voice_name)
                 except Exception as exc:
                     fallback_rate_value = 0
                     fallback_signature = tts_clip_signature(spoken_text, segment_voice_name, fallback_rate_value)
                     fallback_clip_path = output_dir / f"segment_{segment.id:04d}_{fallback_signature}.mp3"
                     try:
-                        await self._save_clip(edge_tts, spoken_text, fallback_clip_path, fallback_rate_value, segment_voice_name)
+                        async with semaphore:
+                            await self._save_clip(edge_tts, spoken_text, fallback_clip_path, fallback_rate_value, segment_voice_name)
                         clip_path = fallback_clip_path
                     except Exception as retry_exc:
                         if fallback_clip_path.exists():
@@ -126,20 +134,22 @@ class EdgeTTSBackend:
                         message = f"Bỏ qua đoạn {segment.id}: Edge TTS không tạo được audio ({retry_exc})"
                         self.warnings.append(message)
                         logger.warning(message, exc_info=exc)
+                        completed_segments += 1
                         if progress_callback:
-                            progress_callback(index / total_segments)
-                        continue
+                            progress_callback(completed_segments / total_segments)
+                        return
             if not clip_path.exists() or clip_path.stat().st_size <= 0:
                 if clip_path.exists():
                     clip_path.unlink()
                 message = f"Bỏ qua đoạn {segment.id}: Edge TTS trả về file audio rỗng."
                 self.warnings.append(message)
                 logger.warning(message)
+                completed_segments += 1
                 if progress_callback:
-                    progress_callback(index / total_segments)
-                continue
+                    progress_callback(completed_segments / total_segments)
+                return
             remove_stale_segment_clips(output_dir, segment.id, clip_path)
-            clips.append(
+            clips_by_index[index] = (
                 VoiceClip(
                     segment_id=segment.id,
                     start=segment.start,
@@ -149,9 +159,14 @@ class EdgeTTSBackend:
                     voice_name=segment_voice_name,
                 )
             )
+            completed_segments += 1
             if progress_callback:
-                progress_callback(index / total_segments)
-        return clips
+                progress_callback(completed_segments / total_segments)
+
+        await asyncio.gather(
+            *(synthesize_one(index, segment) for index, segment in enumerate(segments, start=1))
+        )
+        return [clips_by_index[index] for index in sorted(clips_by_index)]
 
     async def _save_clip(self, edge_tts, spoken_text: str, clip_path: Path, rate_value: int, voice_name: str) -> None:
         temporary_path = clip_path.with_name(f"{clip_path.stem}.tmp{clip_path.suffix}")

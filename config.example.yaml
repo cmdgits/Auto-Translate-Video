@@ -55,6 +55,7 @@ tts:
   rate_ceil: 45
   background_audio_gain: 0.0
   voiceover_gain: 1.4
+  max_concurrency: 3
   speaker_voice_map:
     SPEAKER_00: vi-VN-NamMinhNeural
     SPEAKER_01: vi-VN-HoaiMyNeural

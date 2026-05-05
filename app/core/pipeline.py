@@ -914,20 +914,14 @@ class VideoTranslationPipeline:
             progress_callback=lambda value: emit_voiceover_progress(0.45 + value * 0.2),
         )
         emit_voiceover_progress(0.65)
-        hardsub_video = self._render_hardsub_output(
-            context,
-            options,
-            progress_callback=lambda value: emit_voiceover_progress(0.65 + value * 0.2),
-        )
-        emit_voiceover_progress(0.85)
         return render_video_with_replaced_audio(
-            input_video=hardsub_video,
+            input_video=context.input_video,
             audio_path=mixed_audio,
             output_video=context.voiceover_video_path,
             ffmpeg_bin=self.config.ffmpeg_bin,
             render_config=self.config.render,
             duration_sec=duration_sec,
-            progress_callback=lambda value: emit_voiceover_progress(0.85 + value * 0.15),
+            progress_callback=lambda value: emit_voiceover_progress(0.65 + value * 0.35),
         )
 
     def _duration_for_context(self, context: JobContext) -> float:
