@@ -25,22 +25,18 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
     if cover_opacity <= 0:
         return ""
 
-    cover_height_ratio = max(0.04, min(render_config.subtitle_cover_height_ratio, 0.24))
+    cover_height_ratio = max(0.03, min(render_config.subtitle_cover_height_ratio, 0.16))
     subtitle_x_ratio = max(0.12, min(float(render_config.subtitle_position_x) / 100, 0.88))
     subtitle_bottom_ratio = max(0.02, min(float(render_config.subtitle_position_y) / 100, 0.45))
     font_ratio = max(0.025, min(float(render_config.subtitle_font_size) / 720, 0.12))
-    cover_width_ratio = max(0.32, min(0.74, font_ratio * 9.2))
+    cover_width_ratio = max(0.28, min(0.70, font_ratio * 8.6))
     cover_left_ratio = max(0.0, min(subtitle_x_ratio - cover_width_ratio / 2, 1.0 - cover_width_ratio))
-    cover_top = max(0.0, min(1.0 - subtitle_bottom_ratio - cover_height_ratio * 1.05, 1.0 - cover_height_ratio))
+    cover_top = max(0.0, min(1.0 - subtitle_bottom_ratio - cover_height_ratio * 0.95, 1.0 - cover_height_ratio))
     cover_mode = str(render_config.subtitle_cover_mode or "blur").strip().lower()
     if cover_mode == "blur":
-        blur_radius = max(3, min(20, round(cover_opacity * 18)))
         return (
-            f"split[base][blur_src];"
-            f"[blur_src]crop=w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:"
-            f"x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f},"
-            f"boxblur={blur_radius}:1[blurred_cover];"
-            f"[base][blurred_cover]overlay=x=W*{cover_left_ratio:.3f}:y=H*{cover_top:.3f}"
+            f"delogo=x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f}:"
+            f"w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:show=0"
         )
 
     return (

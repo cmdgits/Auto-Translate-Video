@@ -118,7 +118,7 @@ class RenderConfig(BaseModel):
     audio_bitrate: str = "192k"
     cover_original_subtitles: bool = True
     subtitle_cover_mode: str = "blur"
-    subtitle_cover_height_ratio: float = 0.10
+    subtitle_cover_height_ratio: float = 0.07
     subtitle_cover_opacity: float = 0.72
     subtitle_font_size: float = 32
     subtitle_position_x: float = 50

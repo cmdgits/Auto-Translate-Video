@@ -877,18 +877,20 @@ body.resizing-canvas * {
   left: 50%;
   right: auto;
   bottom: 0;
-  width: 48%;
-  height: 10%;
-  background: #000;
+  width: 44%;
+  height: 7%;
+  background: rgba(255, 255, 255, 0.015);
   opacity: 0.72;
-  border-radius: 14px;
+  border-radius: 999px;
   pointer-events: none;
   transform: translateX(-50%);
+  overflow: hidden;
 }
 
 .original-subtitle-cover.blur-cover {
-  background: transparent;
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.015);
+  backdrop-filter: blur(5px);
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.05);
 }
 
 .original-subtitle-cover.box-cover {
