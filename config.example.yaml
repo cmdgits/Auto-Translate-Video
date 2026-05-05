@@ -54,6 +54,8 @@ render:
   ocr_min_confidence: 45.0
   ocr_box_padding: 8
   ocr_blur_kernel_size: 51
+  ocr_frame_interval: 20
+  ocr_scan_region: subtitle
   ocr_tesseract_config: --psm 11
 tts:
   backend: edge-tts

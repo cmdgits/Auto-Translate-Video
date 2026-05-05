@@ -562,7 +562,7 @@ function updateRenderProgress(job = null) {
   }
   const percent = Math.max(0, Math.min(100, Math.round((job.progress || 0) * 100)));
   renderProgressFill.style.width = `${percent}%`;
-  renderProgressLabel.textContent = `${stageLabel(job.stage || "queued")} ${percent}%`;
+  renderProgressLabel.textContent = renderProgressText(job, percent);
   renderProgress.setAttribute("aria-valuenow", String(percent));
 }
 
@@ -1137,6 +1137,13 @@ function statusLabel(status) {
 
 function stageLabel(stage) {
   return STAGE_LABELS[stage] || stage || "--";
+}
+
+function renderProgressText(job, percent) {
+  if (job?.stage === "rendering_hardsub" && percent > 0 && percent < 55) {
+    return `Đang nhận diện chữ gốc để làm mờ ${percent}%`;
+  }
+  return `${stageLabel(job?.stage || "queued")} ${percent}%`;
 }
 
 function escapeHtml(value) {

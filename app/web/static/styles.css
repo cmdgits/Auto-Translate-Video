@@ -701,10 +701,10 @@ button {
   top: calc(100% + 8px);
   right: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(136px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   align-items: center;
   gap: 8px 10px;
-  width: min(760px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 40px));
   max-height: 240px;
   margin-top: 0;
   padding: 12px;
@@ -723,7 +723,7 @@ button {
 
 .zoom-control {
   display: grid;
-  grid-template-columns: 58px minmax(72px, 1fr) 42px;
+  grid-template-columns: 60px minmax(74px, 1fr) 44px;
   align-items: center;
   gap: 7px;
   min-height: 30px;
@@ -735,6 +735,13 @@ button {
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.zoom-control > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeline-zoom-control {
@@ -795,8 +802,17 @@ body.subtitle-style-mode .subtitle-style-control {
 }
 
 .cover-mode-control {
-  grid-template-columns: 78px minmax(90px, 1fr) minmax(70px, 1fr) 42px;
+  grid-template-columns: 74px minmax(94px, 1fr) minmax(72px, 1fr) 44px;
   grid-column: span 2;
+}
+
+.cover-mode-control > span {
+  white-space: normal;
+  line-height: 1.1;
+}
+
+.cover-mode-control select {
+  min-width: 0;
 }
 
 .canvas-title {
@@ -1807,9 +1823,14 @@ body.dragging * {
   }
 
   .canvas-controls-body {
+    grid-template-columns: 1fr;
     width: min(420px, calc(100vw - 24px));
     justify-content: flex-start;
     max-height: 220px;
+  }
+
+  .cover-mode-control {
+    grid-column: span 1;
   }
 
   .canvas-frame {

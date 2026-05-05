@@ -78,12 +78,16 @@ def blur_text_in_video_with_ocr(
             raise ProcessError("Không mở được stdin FFmpeg để ghi frame OCR blur.")
 
         frame_index = 0
+        detection_interval = max(1, int(getattr(render_config, "ocr_frame_interval", 10) or 10))
+        cached_boxes: list[Box] = []
         try:
             while True:
                 ok, frame = capture.read()
                 if not ok:
                     break
-                for x1, y1, x2, y2 in detector.detect(frame):
+                if frame_index % detection_interval == 0 or not cached_boxes:
+                    cached_boxes = detector.detect(frame)
+                for x1, y1, x2, y2 in cached_boxes:
                     _blur_roi(frame, x1, y1, x2, y2, int(render_config.ocr_blur_kernel_size))
                 process.stdin.write(frame.tobytes())
                 frame_index += 1
@@ -113,10 +117,16 @@ class TesseractTextDetector:
         self.config = str(render_config.ocr_tesseract_config or "--psm 11").strip() or "--psm 11"
         self.min_confidence = float(render_config.ocr_min_confidence)
         self.padding = max(0, int(render_config.ocr_box_padding))
+        self.scan_region = str(getattr(render_config, "ocr_scan_region", "subtitle") or "subtitle").strip().lower()
 
     def detect(self, frame) -> list[Box]:
         cv2 = _load_cv2()
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_height, frame_width = frame.shape[:2]
+        region_left, region_top, region_right, region_bottom = self._scan_box(frame_width, frame_height)
+        scan_frame = frame[region_top:region_bottom, region_left:region_right]
+        if scan_frame.size == 0:
+            return []
+        rgb_frame = cv2.cvtColor(scan_frame, cv2.COLOR_BGR2RGB)
         try:
             data = self.pytesseract.image_to_data(
                 rgb_frame,
@@ -133,7 +143,6 @@ class TesseractTextDetector:
                 config=self.config,
                 output_type=self.pytesseract.Output.DICT,
             )
-        frame_height, frame_width = frame.shape[:2]
         boxes: list[Box] = []
         for index, text in enumerate(data.get("text", [])):
             if not str(text or "").strip():
@@ -144,8 +153,8 @@ class TesseractTextDetector:
                 confidence = 0.0
             if confidence < self.min_confidence:
                 continue
-            left = int(data["left"][index])
-            top = int(data["top"][index])
+            left = region_left + int(data["left"][index])
+            top = region_top + int(data["top"][index])
             width = int(data["width"][index])
             height = int(data["height"][index])
             if width <= 0 or height <= 0:
@@ -161,6 +170,27 @@ class TesseractTextDetector:
                 )
             )
         return boxes
+
+    def _scan_box(self, frame_width: int, frame_height: int) -> Box:
+        if self.scan_region in {"full", "all", "frame"}:
+            return 0, 0, frame_width, frame_height
+        cover_height_ratio = max(0.03, min(float(self.render_config.subtitle_cover_height_ratio), 0.30))
+        cover_width_ratio = max(0.28, min(float(self.render_config.subtitle_cover_width_ratio), 1.0))
+        subtitle_x_ratio = max(0.0, min(float(self.render_config.subtitle_position_x) / 100, 1.0))
+        subtitle_bottom_ratio = max(0.0, min(float(self.render_config.subtitle_position_y) / 100, 0.60))
+        extra_height = max(0.08, cover_height_ratio * 1.75)
+        region_height = min(0.42, cover_height_ratio + extra_height)
+        region_width = min(1.0, cover_width_ratio + 0.16)
+        left_ratio = max(0.0, min(subtitle_x_ratio - region_width / 2, 1.0 - region_width))
+        top_ratio = max(0.0, min(1.0 - subtitle_bottom_ratio - region_height, 1.0 - region_height))
+        return _clip_box(
+            int(frame_width * left_ratio),
+            int(frame_height * top_ratio),
+            int(frame_width * (left_ratio + region_width)),
+            int(frame_height * (top_ratio + region_height)),
+            frame_width,
+            frame_height,
+        )
 
 
 def _build_ocr_detector(render_config: RenderConfig) -> TesseractTextDetector:

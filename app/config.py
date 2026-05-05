@@ -129,6 +129,8 @@ class RenderConfig(BaseModel):
     ocr_min_confidence: float = 45.0
     ocr_box_padding: int = 8
     ocr_blur_kernel_size: int = 51
+    ocr_frame_interval: int = 20
+    ocr_scan_region: str = "subtitle"
     ocr_tesseract_config: str = "--psm 11"
 
 
