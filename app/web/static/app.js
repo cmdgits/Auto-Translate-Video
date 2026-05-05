@@ -20,6 +20,9 @@ const canvasResizeHandle = document.getElementById("canvasResizeHandle");
 const videoZoomRange = document.getElementById("videoZoomRange");
 const videoZoomValue = document.getElementById("videoZoomValue");
 const videoFitBtn = document.getElementById("videoFitBtn");
+const videoBackBtn = document.getElementById("videoBackBtn");
+const videoPlayPauseBtn = document.getElementById("videoPlayPauseBtn");
+const videoForwardBtn = document.getElementById("videoForwardBtn");
 const subtitleSizeRange = document.getElementById("subtitleSizeRange");
 const subtitleSizeValue = document.getElementById("subtitleSizeValue");
 const subtitleXRange = document.getElementById("subtitleXRange");
@@ -688,6 +691,46 @@ function playSelectedSegmentPreview() {
 
 function showSubtitleOverlayInCurrentMode() {
   return state.previewMode === "hardsub";
+}
+
+function hasPreviewVideo() {
+  return Boolean(videoPreview?.currentSrc || videoPreview?.src || videoPreview?.dataset.previewUrl);
+}
+
+function updateVideoPlaybackControls() {
+  const canControl = hasPreviewVideo();
+  [videoBackBtn, videoPlayPauseBtn, videoForwardBtn].forEach((button) => {
+    if (button) {
+      button.disabled = !canControl;
+    }
+  });
+  if (videoPlayPauseBtn) {
+    videoPlayPauseBtn.textContent = canControl && !videoPreview.paused ? "⏸" : "▶";
+    videoPlayPauseBtn.title = canControl && !videoPreview.paused ? "Tạm dừng" : "Phát";
+  }
+}
+
+function seekPreviewBy(seconds) {
+  if (!hasPreviewVideo()) {
+    return;
+  }
+  const duration = Number(videoPreview.duration || state.job?.duration_sec || 0);
+  const currentTime = Number(videoPreview.currentTime || 0);
+  const maxTime = duration > 0 ? duration : Number.MAX_SAFE_INTEGER;
+  videoPreview.currentTime = Math.max(0, Math.min(maxTime, currentTime + seconds));
+  applyPlaybackHighlight(videoPreview.currentTime || 0);
+}
+
+async function togglePreviewPlayback() {
+  if (!hasPreviewVideo()) {
+    return;
+  }
+  if (videoPreview.paused) {
+    await videoPreview.play().catch(() => {});
+  } else {
+    videoPreview.pause();
+  }
+  updateVideoPlaybackControls();
 }
 
 function preferredPreviewSourceMode(mode) {
@@ -1582,13 +1625,16 @@ function availableCanvasSize() {
 function applyVideoZoom(value = state.videoZoom) {
   const nextZoom = Math.max(MIN_VIDEO_ZOOM, Math.min(MAX_VIDEO_ZOOM, Number(value) || 100));
   const { width: availableWidth, height: availableHeight } = availableCanvasSize();
+  const aspectRatio = currentVideoAspectRatio();
   const zoomScale = nextZoom / 100;
-  const targetWidth = Math.min(availableWidth, availableWidth * zoomScale);
-  const targetHeight = Math.min(availableHeight, availableHeight * zoomScale);
+  const fitWidth = Math.min(availableWidth, availableHeight * aspectRatio);
+  const fitHeight = Math.min(availableHeight, fitWidth / aspectRatio);
+  const targetWidth = Math.min(availableWidth, fitWidth * zoomScale);
+  const targetHeight = Math.min(availableHeight, targetWidth / aspectRatio);
   state.videoZoom = nextZoom;
   canvasFrame.style.width = `${Math.round(targetWidth)}px`;
   canvasFrame.style.height = `${Math.round(targetHeight)}px`;
-  canvasFrame.style.aspectRatio = "auto";
+  canvasFrame.style.aspectRatio = `${aspectRatio}`;
   if (videoZoomRange) {
     videoZoomRange.value = String(nextZoom);
   }
@@ -1643,6 +1689,7 @@ function updatePreviewSource(url) {
   const currentTime = Number(videoPreview.currentTime || 0);
   videoPreview.dataset.previewUrl = url;
   videoPreview.src = url;
+  updateVideoPlaybackControls();
   if (currentTime > 0) {
     videoPreview.addEventListener("loadedmetadata", () => {
       seekVideoToTime(currentTime);
@@ -1661,6 +1708,7 @@ function setPreviewMode(mode) {
       videoPreview.style.display = "block";
       emptyState.style.display = "none";
       setPreviewButtons();
+      updateVideoPlaybackControls();
       applyPlaybackHighlight(videoPreview.currentTime || 0);
     }
     return;
@@ -1671,6 +1719,7 @@ function setPreviewMode(mode) {
   videoPreview.style.display = "block";
   emptyState.style.display = "none";
   setPreviewButtons();
+  updateVideoPlaybackControls();
   applyPlaybackHighlight(videoPreview.currentTime || 0);
 }
 
@@ -2107,6 +2156,7 @@ function applyJobState(job) {
     videoPreview.style.display = "block";
     emptyState.style.display = "none";
   }
+  updateVideoPlaybackControls();
 
   if (restoredDraft) {
     setStatus("Đã khôi phục nháp phụ đề tự lưu.", "warn");
@@ -2200,6 +2250,7 @@ function clearSelectedJob() {
   videoPreview.load();
   videoPreview.style.display = "none";
   emptyState.style.display = "grid";
+  updateVideoPlaybackControls();
   videoName.textContent = "Chưa chọn video";
   languageBadge.textContent = "ngôn ngữ gốc: -- · ASR: auto";
   progressBadge.textContent = "0%";
@@ -2679,6 +2730,7 @@ fileInput.addEventListener("change", () => {
   videoPreview.src = URL.createObjectURL(files[0]);
   videoPreview.style.display = "block";
   emptyState.style.display = "none";
+  updateVideoPlaybackControls();
   state.previewMode = "source";
   setPreviewButtons();
 });
@@ -2811,6 +2863,20 @@ videoFitBtn.addEventListener("click", () => {
   resetVideoZoom();
   setCanvasControlsOpen(false);
 });
+
+if (videoBackBtn) {
+  videoBackBtn.addEventListener("click", () => seekPreviewBy(-5));
+}
+
+if (videoPlayPauseBtn) {
+  videoPlayPauseBtn.addEventListener("click", () => {
+    togglePreviewPlayback();
+  });
+}
+
+if (videoForwardBtn) {
+  videoForwardBtn.addEventListener("click", () => seekPreviewBy(5));
+}
 
 if (canvasControlsToggle && canvasControls) {
   canvasControlsToggle.addEventListener("click", () => {
@@ -3392,10 +3458,16 @@ videoPreview.addEventListener("timeupdate", () => {
   applyPlaybackHighlight(videoPreview.currentTime || 0);
 });
 
+videoPreview.addEventListener("play", updateVideoPlaybackControls);
+videoPreview.addEventListener("pause", updateVideoPlaybackControls);
+videoPreview.addEventListener("ended", updateVideoPlaybackControls);
+videoPreview.addEventListener("loadedmetadata", updateVideoPlaybackControls);
+
 videoPreview.addEventListener("loadeddata", () => {
   emptyState.style.display = "none";
   videoPreview.style.display = "block";
   applyVideoZoom();
+  updateVideoPlaybackControls();
 });
 
 window.addEventListener("resize", () => {
