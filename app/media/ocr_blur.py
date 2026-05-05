@@ -85,7 +85,7 @@ def blur_text_in_video_with_ocr(
                 ok, frame = capture.read()
                 if not ok:
                     break
-                if frame_index % detection_interval == 0 or not cached_boxes:
+                if frame_index % detection_interval == 0:
                     cached_boxes = detector.detect(frame)
                 for x1, y1, x2, y2 in cached_boxes:
                     _blur_roi(frame, x1, y1, x2, y2, int(render_config.ocr_blur_kernel_size))
@@ -174,14 +174,10 @@ class TesseractTextDetector:
     def _scan_box(self, frame_width: int, frame_height: int) -> Box:
         if self.scan_region in {"full", "all", "frame"}:
             return 0, 0, frame_width, frame_height
-        cover_height_ratio = max(0.03, min(float(self.render_config.subtitle_cover_height_ratio), 0.30))
-        cover_width_ratio = max(0.28, min(float(self.render_config.subtitle_cover_width_ratio), 1.0))
-        subtitle_x_ratio = max(0.0, min(float(self.render_config.subtitle_position_x) / 100, 1.0))
         subtitle_bottom_ratio = max(0.0, min(float(self.render_config.subtitle_position_y) / 100, 0.60))
-        extra_height = max(0.08, cover_height_ratio * 1.75)
-        region_height = min(0.42, cover_height_ratio + extra_height)
-        region_width = min(1.0, cover_width_ratio + 0.16)
-        left_ratio = max(0.0, min(subtitle_x_ratio - region_width / 2, 1.0 - region_width))
+        region_height = 0.36
+        region_width = 1.0
+        left_ratio = 0.0
         top_ratio = max(0.0, min(1.0 - subtitle_bottom_ratio - region_height, 1.0 - region_height))
         return _clip_box(
             int(frame_width * left_ratio),

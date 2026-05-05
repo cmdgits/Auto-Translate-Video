@@ -802,12 +802,22 @@ button {
   min-width: 0;
 }
 
-.subtitle-style-control {
+.subtitle-style-control,
+.cover-blur-note,
+.cover-box-control {
   display: none;
 }
 
 body.subtitle-style-mode .zoom-control.subtitle-style-control,
 body.subtitle-style-mode .canvas-control-group.subtitle-style-control {
+  display: grid;
+}
+
+body.subtitle-style-mode.cover-mode-blur .cover-blur-note {
+  display: block;
+}
+
+body.subtitle-style-mode.cover-mode-box .cover-box-control {
   display: grid;
 }
 
@@ -834,6 +844,16 @@ body.subtitle-style-mode .canvas-control-group.subtitle-style-control {
 
 .select-control output {
   display: none;
+}
+
+.cover-blur-note {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #31567a;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.45;
 }
 
 .video-fit-control {

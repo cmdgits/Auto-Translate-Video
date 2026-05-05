@@ -753,7 +753,10 @@ class VideoTranslationPipeline:
         if not options:
             return self.config.render.model_copy(update=updates) if updates else self.config.render
         if options.subtitle_cover_mode:
-            updates["subtitle_cover_mode"] = options.subtitle_cover_mode
+            cover_mode = str(options.subtitle_cover_mode).strip().lower()
+            updates["subtitle_cover_mode"] = cover_mode
+            if cover_mode in {"none", "off", "disabled"}:
+                updates["subtitle_cover_opacity"] = 0.0
         if options.subtitle_cover_opacity is not None:
             updates["cover_original_subtitles"] = options.subtitle_cover_opacity > 0
             updates["subtitle_cover_opacity"] = max(0.0, min(1.0, float(options.subtitle_cover_opacity)))

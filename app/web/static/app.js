@@ -729,7 +729,7 @@ function applySubtitleOverlayScale() {
 }
 
 function applySubtitleStyle(nextStyle = {}) {
-  const coverMode = ["blur", "box"].includes(nextStyle.coverMode)
+  const coverMode = ["none", "blur", "box"].includes(nextStyle.coverMode)
     ? nextStyle.coverMode
     : state.subtitleStyle.coverMode;
   state.subtitleStyle = {
@@ -758,21 +758,20 @@ function applySubtitleStyle(nextStyle = {}) {
   const coverBottom = Math.max(0, state.subtitleStyle.y - state.subtitleStyle.coverHeight * 0.04);
   originalSubtitleCover.style.height = `${state.subtitleStyle.coverHeight}%`;
   originalSubtitleCover.style.bottom = `${coverBottom}%`;
-  originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "blur"
-    ? "1"
-    : String(state.subtitleStyle.coverOpacity / 100);
+  originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "box"
+    ? String(state.subtitleStyle.coverOpacity / 100)
+    : "0";
   originalSubtitleCover.style.left = `${coverCenter}%`;
   originalSubtitleCover.style.right = "auto";
   originalSubtitleCover.style.width = `${compactCoverWidth}%`;
   originalSubtitleCover.style.transform = "translateX(-50%)";
-  originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "blur"
-    ? `blur(${Math.max(6, Math.round(state.subtitleStyle.coverOpacity / 6))}px)`
-    : "none";
-  originalSubtitleCover.style.background = state.subtitleStyle.coverMode === "blur"
-    ? "rgba(255,255,255,0.015)"
-    : "#000";
+  originalSubtitleCover.style.backdropFilter = "none";
+  originalSubtitleCover.style.background = state.subtitleStyle.coverMode === "box" ? "#000" : "transparent";
   originalSubtitleCover.classList.toggle("blur-cover", state.subtitleStyle.coverMode === "blur");
-  originalSubtitleCover.classList.toggle("box-cover", state.subtitleStyle.coverMode !== "blur");
+  originalSubtitleCover.classList.toggle("box-cover", state.subtitleStyle.coverMode === "box");
+  document.body.classList.toggle("cover-mode-none", state.subtitleStyle.coverMode === "none");
+  document.body.classList.toggle("cover-mode-blur", state.subtitleStyle.coverMode === "blur");
+  document.body.classList.toggle("cover-mode-box", state.subtitleStyle.coverMode === "box");
 
   subtitleSizeRange.value = String(state.subtitleStyle.size);
   subtitleXRange.value = String(state.subtitleStyle.x);
@@ -1144,6 +1143,16 @@ function renderProgressText(job, percent) {
     return `Đang nhận diện chữ gốc để làm mờ ${percent}%`;
   }
   return `${stageLabel(job?.stage || "queued")} ${percent}%`;
+}
+
+function coverRenderDescription() {
+  if (state.subtitleStyle.coverMode === "blur") {
+    return "Gaussian Blur OCR đang bật nên xuất sẽ lâu hơn.";
+  }
+  if (state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0) {
+    return "Phủ màu chữ gốc đang bật.";
+  }
+  return "Không che chữ gốc, xuất sẽ nhanh hơn.";
 }
 
 function escapeHtml(value) {
@@ -1537,7 +1546,12 @@ function setPreviewButtons() {
   previewVoiceoverBtn.classList.toggle("active", state.previewMode === "voiceover");
   previewVoiceoverBtn.disabled = !previewUrls.voiceover;
   document.body.classList.toggle("subtitle-style-mode", showSubtitleOverlayInCurrentMode());
-  originalSubtitleCover.classList.toggle("hidden", !showSubtitleOverlayInCurrentMode() || state.subtitleStyle.coverOpacity <= 0);
+  originalSubtitleCover.classList.toggle(
+    "hidden",
+    !showSubtitleOverlayInCurrentMode()
+      || state.subtitleStyle.coverMode !== "box"
+      || (state.subtitleStyle.coverMode === "box" && state.subtitleStyle.coverOpacity <= 0),
+  );
 }
 
 function currentVideoAspectRatio() {
@@ -2392,7 +2406,7 @@ async function renderHardsubFromCurrentSubtitles() {
   if (!state.jobId || hardsubLink.classList.contains("disabled")) {
     return;
   }
-  setStatus("Đang xuất MP4 phụ đề từ nội dung đã sửa...", "neutral");
+  setStatus(`Đang xuất MP4 phụ đề từ nội dung đã sửa... ${coverRenderDescription()}`, "neutral");
   await runRenderWithDestination(
     `/api/jobs/${state.jobId}/render/hardsub`,
     "video_hardsub",
@@ -2416,10 +2430,13 @@ async function renderSoftsubFromCurrentSubtitles() {
   if (!state.jobId || softsubLink.classList.contains("disabled")) {
     return;
   }
-  const coverEnabled = Number(state.subtitleStyle.coverOpacity || 0) > 0;
+  const coverEnabled = state.subtitleStyle.coverMode === "blur"
+    || (state.subtitleStyle.coverMode === "box" && Number(state.subtitleStyle.coverOpacity || 0) > 0);
   setStatus(
-    coverEnabled
-      ? "Đang xuất MKV softsub có che/blur chữ gốc, bước này sẽ lâu hơn vì cần render lại hình..."
+    state.subtitleStyle.coverMode === "blur"
+      ? "Đang xuất MKV softsub có Gaussian Blur OCR, bước này sẽ lâu hơn vì cần render lại hình..."
+      : coverEnabled
+      ? "Đang xuất MKV softsub có phủ màu chữ gốc..."
       : "Đang xuất MKV softsub gồm nhiều track phụ đề...",
     "neutral",
   );

@@ -33,7 +33,7 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
     cover_left_ratio = max(0.0, min(subtitle_x_ratio - cover_width_ratio / 2, 1.0 - cover_width_ratio))
     cover_top = max(0.0, min(1.0 - subtitle_bottom_ratio - cover_height_ratio * 0.95, 1.0 - cover_height_ratio))
     cover_mode = str(render_config.subtitle_cover_mode or "blur").strip().lower()
-    if cover_mode == "blur":
+    if cover_mode in {"blur", "none", "off", "disabled"}:
         return ""
 
     return (
@@ -45,11 +45,7 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
 
 def should_use_ocr_gaussian_blur(render_config: RenderConfig) -> bool:
     cover_mode = str(render_config.subtitle_cover_mode or "blur").strip().lower()
-    return bool(
-        render_config.cover_original_subtitles
-        and cover_mode == "blur"
-        and max(0.0, min(render_config.subtitle_cover_opacity, 1.0)) > 0
-    )
+    return bool(render_config.cover_original_subtitles and cover_mode == "blur")
 
 
 def create_ocr_blurred_video(
