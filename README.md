@@ -13,6 +13,7 @@ Auto Translate Video là công cụ dịch video sang tiếng Việt, chỉnh ph
 - Tự động tách âm thanh, nhận diện lời thoại bằng `faster-whisper` và tạo phụ đề theo thời gian.
 - Dịch phụ đề sang tiếng Việt bằng nhiều backend như `echo`, `mymemory`, `libretranslate`, `gpt`, `gemini` hoặc `llm-http`.
 - Chỉnh sửa phụ đề trực tiếp trên timeline; bấm vào đoạn timeline sẽ chuyển video tới đúng đoạn đó.
+- Trình xem video dùng nút điều khiển riêng bên dưới để lùi, phát/tạm dừng và tiến, giúp khung video không bị thanh điều khiển mặc định che mất.
 - Hiển thị waveform âm thanh trên timeline để canh lời thoại trực quan hơn.
 - Phóng to, thu nhỏ video và timeline để canh vị trí, thời gian hiển thị phụ đề dễ hơn.
 - Kéo cả đoạn phụ đề hoặc kéo mép trái/phải để chỉnh thời gian, có snap nhẹ theo playhead.
@@ -161,6 +162,7 @@ http://127.0.0.1:8001
 ### 4. Chỉnh hiển thị trên video
 
 - Chọn chế độ xem phụ đề để kiểm tra chữ hiển thị trên video.
+- Dùng cụm nút dưới khung video để lùi 5 giây, phát/tạm dừng hoặc tiến 5 giây; khung xem trước không hiện thanh điều khiển mặc định của trình duyệt.
 - Tùy chỉnh cỡ chữ, vị trí, vùng đặt phụ đề và độ che phủ chữ gốc.
 - Nếu video có chữ gốc, có thể dùng chế độ làm mờ vùng chữ cũ thay vì phủ màu cứng.
 - Khi phóng to hoặc thu nhỏ video, phụ đề sẽ co giãn theo khung video để dễ canh chỉnh.
@@ -212,7 +214,7 @@ worker:
   max_attempts: 3
 ```
 
-Trong bản cấu hình local hiện tại, `config.yaml` đã được bật sẵn `worker.backend: celery`. Khi dùng chế độ này, nên mở 3 cửa sổ terminal theo thứ tự:
+Trong cấu hình mặc định hiện tại, `worker.backend: thread`, nên chỉ cần chạy `run_web.bat` là web UI có thể tự xử lý tác vụ nền. Chỉ chuyển sang `celery` nếu muốn tách worker riêng hoặc xử lý hàng đợi nặng hơn. Khi dùng Celery/Redis, nên mở 3 cửa sổ terminal theo thứ tự:
 
 ```powershell
 run_redis_docker.bat
@@ -227,11 +229,34 @@ run_web.bat
 
 Nếu không dùng Docker, hãy tự bật Redis sao cho truy cập được tại `redis://localhost:6379/0`, rồi chạy `run_worker.bat` và `run_web.bat`.
 
-Sau đó chạy worker:
+Nếu muốn chạy worker bằng Python thay cho file BAT:
 
 ```powershell
 python -m app.main worker
 ```
+
+## Dọn Dẹp Và Kiểm Tra
+
+Các thư mục/file có thể xoá an toàn khi muốn dọn rác build hoặc cache:
+
+- `build/`, `dist/`, `*.egg-info/`: artefact đóng gói hoặc metadata tạm.
+- `.pytest_cache/`, `__pycache__/`, `*.pyc`: cache test và bytecode Python.
+- Một số thư mục tạm trong `workspace_data/tmp/` có tiền tố `pip-` hoặc `pytest-` nếu không còn tiến trình Python/pip nào đang chạy.
+
+Không nên xoá các mục sau nếu còn muốn giữ dữ liệu và môi trường đang dùng:
+
+- `workspace_data/jobs/`, `workspace_data/uploads/`: video, phụ đề, kết quả render và trạng thái tác vụ.
+- `models/`: model ASR đã tải.
+- `tools/Python312/`, `tools/ffmpeg/`: Python portable và FFmpeg portable.
+
+Sau khi dọn hoặc cập nhật dependency, có thể kiểm tra nhanh bằng:
+
+```powershell
+install_all.bat --verify-only
+tools\Python312\python.exe -m pip check
+```
+
+Nếu trình duyệt vẫn hiển thị giao diện cũ sau khi cập nhật, hãy tải lại trang bằng `Ctrl + F5`.
 
 ## Cấu Hình Dịch Và API
 
