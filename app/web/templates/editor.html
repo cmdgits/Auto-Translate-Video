@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-62" />
+    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-63" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -184,7 +184,7 @@
                 <input id="videoZoomRange" type="range" min="60" max="180" step="5" value="100" />
                 <output id="videoZoomValue">100%</output>
               </label>
-              <label class="zoom-control subtitle-style-control">
+              <label class="zoom-control subtitle-style-control cover-mode-control">
                 <span>Cỡ chữ</span>
                 <input id="subtitleSizeRange" type="range" min="8" max="64" step="1" value="32" />
                 <output id="subtitleSizeValue">32px</output>
@@ -209,9 +209,14 @@
                 <output id="subtitleCoverValue">72%</output>
               </label>
               <label class="zoom-control subtitle-style-control">
-                <span>Vùng che</span>
+                <span>Cao che</span>
                 <input id="subtitleCoverHeightRange" type="range" min="3" max="16" step="1" value="7" />
                 <output id="subtitleCoverHeightValue">7%</output>
+              </label>
+              <label class="zoom-control subtitle-style-control">
+                <span>Rộng che</span>
+                <input id="subtitleCoverWidthRange" type="range" min="28" max="96" step="1" value="86" />
+                <output id="subtitleCoverWidthValue">86%</output>
               </label>
               <button class="ghost-button" id="videoFitBtn" type="button">Vừa khung</button>
             </div>
@@ -376,6 +381,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-62" defer></script>
+    <script src="/static/app.js?v=capcut-layout-20260504-63" defer></script>
   </body>
 </html>

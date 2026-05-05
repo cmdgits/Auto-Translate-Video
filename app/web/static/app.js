@@ -31,6 +31,8 @@ const subtitleCoverValue = document.getElementById("subtitleCoverValue");
 const subtitleCoverModeSelect = document.getElementById("subtitleCoverModeSelect");
 const subtitleCoverHeightRange = document.getElementById("subtitleCoverHeightRange");
 const subtitleCoverHeightValue = document.getElementById("subtitleCoverHeightValue");
+const subtitleCoverWidthRange = document.getElementById("subtitleCoverWidthRange");
+const subtitleCoverWidthValue = document.getElementById("subtitleCoverWidthValue");
 const subtitleOverlay = document.getElementById("subtitleOverlay");
 const originalSubtitleCover = document.getElementById("originalSubtitleCover");
 const emptyState = document.getElementById("emptyState");
@@ -275,6 +277,7 @@ const state = {
     coverMode: "blur",
     coverOpacity: 72,
     coverHeight: 7,
+    coverWidth: 86,
   },
   previewMode: "source",
   previewSourceMode: "source",
@@ -736,6 +739,7 @@ function applySubtitleStyle(nextStyle = {}) {
     coverMode: coverMode || "blur",
     coverOpacity: clampNumber(nextStyle.coverOpacity ?? state.subtitleStyle.coverOpacity, 0, 100, 72),
     coverHeight: clampNumber(nextStyle.coverHeight ?? state.subtitleStyle.coverHeight, 3, 16, 7),
+    coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 28, 96, 86),
   };
   applySubtitleOverlayScale();
   subtitleOverlay.style.left = `${state.subtitleStyle.x}%`;
@@ -744,7 +748,7 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleOverlay.style.transform = "translateX(-50%)";
   subtitleOverlay.style.width = "max-content";
   subtitleOverlay.style.maxWidth = "84%";
-  const compactCoverWidth = clampNumber(state.subtitleStyle.size * 1.02, 28, 70, 44);
+  const compactCoverWidth = state.subtitleStyle.coverWidth;
   const coverCenter = clampNumber(
     state.subtitleStyle.x,
     compactCoverWidth / 2,
@@ -776,11 +780,13 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleCoverModeSelect.value = state.subtitleStyle.coverMode;
   subtitleCoverRange.value = String(state.subtitleStyle.coverOpacity);
   subtitleCoverHeightRange.value = String(state.subtitleStyle.coverHeight);
-  subtitleSizeValue.textContent = `${state.subtitleStyle.size}px`;
-  subtitleXValue.textContent = `${state.subtitleStyle.x}%`;
-  subtitleYValue.textContent = `${state.subtitleStyle.y}%`;
-  subtitleCoverValue.textContent = `${state.subtitleStyle.coverOpacity}%`;
-  subtitleCoverHeightValue.textContent = `${state.subtitleStyle.coverHeight}%`;
+  subtitleCoverWidthRange.value = String(state.subtitleStyle.coverWidth);
+  subtitleSizeValue.textContent = `${Math.round(state.subtitleStyle.size)}px`;
+  subtitleXValue.textContent = `${Math.round(state.subtitleStyle.x)}%`;
+  subtitleYValue.textContent = `${Math.round(state.subtitleStyle.y)}%`;
+  subtitleCoverValue.textContent = `${Math.round(state.subtitleStyle.coverOpacity)}%`;
+  subtitleCoverHeightValue.textContent = `${Math.round(state.subtitleStyle.coverHeight)}%`;
+  subtitleCoverWidthValue.textContent = `${Math.round(state.subtitleStyle.coverWidth)}%`;
 }
 
 function loadSubtitleStyle() {
@@ -800,6 +806,7 @@ function subtitleStylePayload() {
     subtitle_cover_mode: state.subtitleStyle.coverMode,
     subtitle_cover_opacity: state.subtitleStyle.coverOpacity / 100,
     subtitle_cover_height_ratio: state.subtitleStyle.coverHeight / 100,
+    subtitle_cover_width_ratio: state.subtitleStyle.coverWidth / 100,
   };
 }
 
@@ -2826,6 +2833,12 @@ subtitleCoverModeSelect.addEventListener("change", () => {
 
 subtitleCoverHeightRange.addEventListener("input", () => {
   applySubtitleStyle({ coverHeight: subtitleCoverHeightRange.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleCoverWidthRange.addEventListener("input", () => {
+  applySubtitleStyle({ coverWidth: subtitleCoverWidthRange.value });
   persistSubtitleStyle();
   setPreviewButtons();
 });

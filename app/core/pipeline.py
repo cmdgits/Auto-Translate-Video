@@ -759,6 +759,8 @@ class VideoTranslationPipeline:
             updates["subtitle_cover_opacity"] = max(0.0, min(1.0, float(options.subtitle_cover_opacity)))
         if options.subtitle_cover_height_ratio is not None:
             updates["subtitle_cover_height_ratio"] = max(0.03, min(0.16, float(options.subtitle_cover_height_ratio)))
+        if options.subtitle_cover_width_ratio is not None:
+            updates["subtitle_cover_width_ratio"] = max(0.28, min(0.96, float(options.subtitle_cover_width_ratio)))
         if options.subtitle_font_size is not None:
             updates["subtitle_font_size"] = max(8.0, min(64.0, float(options.subtitle_font_size)))
         if options.subtitle_position_x is not None:

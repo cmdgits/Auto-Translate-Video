@@ -26,6 +26,10 @@ if ffmpeg_dir.exists():
         if binary_path.exists():
             binaries.append((str(binary_path), "tools/ffmpeg/bin"))
 
+tesseract_dir = project_root / "tools" / "Tesseract-OCR"
+if tesseract_dir.exists():
+    datas.append((str(tesseract_dir), "tools/Tesseract-OCR"))
+
 hiddenimports = [
     "app.web.main",
     "app.core.celery_app",
@@ -35,7 +39,9 @@ hiddenimports = [
     "app.translate.libretranslate_backend",
     "app.translate.mymemory_backend",
     "app.tts.edge_tts_backend",
+    "cv2",
     "faster_whisper.assets",
+    "pytesseract",
 ]
 
 a = Analysis(

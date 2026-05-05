@@ -41,6 +41,26 @@ def add_bundled_ffmpeg_to_path() -> None:
             break
 
 
+def add_bundled_tesseract_to_path() -> None:
+    import os
+
+    bundle_root = Path(getattr(sys, "_MEIPASS", runtime_root()))
+    candidates = [
+        runtime_root() / "tools" / "Tesseract-OCR",
+        bundle_root / "tools" / "Tesseract-OCR",
+    ]
+    for candidate in candidates:
+        tesseract_exe = candidate / "tesseract.exe"
+        if tesseract_exe.exists():
+            os.environ.setdefault("TESSERACT_CMD", str(tesseract_exe))
+            os.environ.setdefault("AUTOTRANSLATE_TESSERACT_CMD", str(tesseract_exe))
+            tessdata_dir = candidate / "tessdata"
+            if tessdata_dir.exists():
+                os.environ.setdefault("TESSDATA_PREFIX", str(tessdata_dir))
+            os.environ["PATH"] = f"{candidate}{os.pathsep}{os.environ.get('PATH', '')}"
+            break
+
+
 def choose_available_port(host: str, preferred_port: int) -> int:
     for port in range(preferred_port, preferred_port + 20):
         with socket() as probe:
@@ -57,6 +77,7 @@ def main() -> None:
     host = "127.0.0.1"
     port = choose_available_port(host, 8001)
     add_bundled_ffmpeg_to_path()
+    add_bundled_tesseract_to_path()
     os.environ.setdefault("AUTOTRANSLATE_WORKER_BACKEND", "thread")
     config_path = bundled_config_path()
     if config_path:

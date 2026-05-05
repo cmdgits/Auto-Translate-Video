@@ -700,15 +700,14 @@ button {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(136px, 1fr));
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  width: min(760px, calc(100vw - 140px));
-  max-height: 160px;
+  gap: 8px 10px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: 240px;
   margin-top: 0;
-  padding: 7px 9px;
+  padding: 12px;
   overflow: auto;
   border: 1px solid rgba(221, 227, 234, 0.9);
   border-radius: 14px;
@@ -722,7 +721,22 @@ button {
   display: none;
 }
 
-.zoom-control,
+.zoom-control {
+  display: grid;
+  grid-template-columns: 58px minmax(72px, 1fr) 42px;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.78);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .timeline-zoom-control {
   display: inline-flex;
   align-items: center;
@@ -733,6 +747,14 @@ button {
   white-space: nowrap;
 }
 
+.timeline-zoom-control input {
+  width: 130px;
+}
+
+.timeline-zoom-control output {
+  min-width: 64px;
+}
+
 .zoom-control input,
 .timeline-zoom-control input {
   accent-color: var(--accent-strong);
@@ -740,7 +762,8 @@ button {
 }
 
 .zoom-control select {
-  max-width: 86px;
+  width: 100%;
+  min-width: 0;
   padding: 4px 8px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -751,7 +774,8 @@ button {
 }
 
 .zoom-control input {
-  width: 92px;
+  width: 100%;
+  min-width: 0;
 }
 
 .subtitle-style-control {
@@ -759,14 +783,20 @@ button {
 }
 
 body.subtitle-style-mode .subtitle-style-control {
-  display: inline-flex;
+  display: grid;
 }
 
 .zoom-control output,
 .timeline-zoom-control output {
-  min-width: 48px;
+  min-width: 0;
   color: #0f172a;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cover-mode-control {
+  grid-template-columns: 78px minmax(90px, 1fr) minmax(70px, 1fr) 42px;
+  grid-column: span 2;
 }
 
 .canvas-title {
@@ -1122,14 +1152,6 @@ body.dragging-subtitle * {
 .timeline-zoom-control {
   flex: 0 0 auto;
   padding: 3px 9px;
-}
-
-.timeline-zoom-control input {
-  width: 130px;
-}
-
-.timeline-zoom-control output {
-  min-width: 64px;
 }
 
 .timeline-actions .muted {

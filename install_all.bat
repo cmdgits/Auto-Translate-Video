@@ -16,12 +16,26 @@ set "FFMPEG_BIN=%FFMPEG_DIR%\bin\ffmpeg.exe"
 set "FFPROBE_BIN=%FFMPEG_DIR%\bin\ffprobe.exe"
 set "FFMPEG_ZIP=%TOOLS_DIR%\ffmpeg-release-essentials.zip"
 set "FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+set "TESSERACT_VERSION=5.4.0.20240606"
+set "TESSERACT_DIR=%TOOLS_DIR%\Tesseract-OCR"
+set "TESSERACT_EXE=%TESSERACT_DIR%\tesseract.exe"
+set "TESSERACT_INSTALLER=%TOOLS_DIR%\tesseract-ocr-w64-setup-%TESSERACT_VERSION%.exe"
+set "TESSERACT_URL=https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-%TESSERACT_VERSION%.exe"
+set "TESSDATA_DIR=%TESSERACT_DIR%\tessdata"
 
 call :resolve_python_exe >nul 2>nul
 
 if /I "%~1"=="--verify-only" (
   call :verify_install
   exit /b !errorlevel!
+)
+if /I "%~1"=="--install-tesseract-only" (
+  if not exist "%TOOLS_DIR%" mkdir "%TOOLS_DIR%"
+  call :ensure_powershell || goto :failed
+  call :ensure_tesseract || goto :failed
+  echo.
+  echo [OK] Da cai/cau hinh Tesseract OCR cho OCR Gaussian Blur.
+  exit /b 0
 )
 
 echo ============================================================
@@ -36,6 +50,7 @@ call :ensure_powershell || goto :failed
 call :ensure_python || goto :failed
 call :ensure_pip || goto :failed
 call :install_dependencies || goto :failed
+call :ensure_tesseract || goto :failed
 call :ensure_ffmpeg || goto :failed
 call :ensure_config || goto :failed
 call :ensure_asr_model
@@ -205,6 +220,70 @@ if not exist "%FFMPEG_BIN%" (
 echo [OK] Da cai FFmpeg portable.
 exit /b 0
 
+:ensure_tesseract
+echo [3b/6] Kiem tra Tesseract OCR...
+if exist "%TESSERACT_EXE%" (
+  echo [OK] Da co Tesseract OCR portable: %TESSERACT_EXE%
+  call :ensure_tesseract_languages
+  exit /b 0
+)
+where tesseract.exe >nul 2>nul
+if not errorlevel 1 (
+  echo [OK] Da co Tesseract OCR trong PATH.
+  exit /b 0
+)
+if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" (
+  echo [OK] Da co Tesseract OCR: %ProgramFiles%\Tesseract-OCR\tesseract.exe
+  exit /b 0
+)
+echo [3b/6] Chua co Tesseract, dang tai ban portable UB Mannheim...
+echo       %TESSERACT_URL%
+call :download_file "%TESSERACT_URL%" "%TESSERACT_INSTALLER%"
+if errorlevel 1 (
+  echo [CANH BAO] Khong tai duoc Tesseract truc tiep, thu cai bang winget neu co...
+  where winget.exe >nul 2>nul
+  if errorlevel 1 (
+    echo [LOI] Khong co winget va khong tai duoc installer Tesseract.
+    echo       Hay tai tay/cai Tesseract OCR tu: https://github.com/UB-Mannheim/tesseract/wiki
+    exit /b 1
+  )
+  winget.exe install --id UB-Mannheim.TesseractOCR --exact --silent --accept-source-agreements --accept-package-agreements
+  if errorlevel 1 exit /b 1
+  exit /b 0
+)
+
+echo [3b/6] Dang cai Tesseract portable vao tools\Tesseract-OCR...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $installer='%TESSERACT_INSTALLER%'; $target='%TESSERACT_DIR%'; if(Test-Path $target){Remove-Item -LiteralPath $target -Recurse -Force}; Start-Process -FilePath $installer -ArgumentList @('/S',('/D='+$target)) -Wait"
+if not exist "%TESSERACT_EXE%" (
+  echo [LOI] Cai Tesseract portable that bai, khong tim thay %TESSERACT_EXE%.
+  exit /b 1
+)
+call :ensure_tesseract_languages
+echo [OK] Da cai Tesseract OCR portable.
+exit /b 0
+
+:ensure_tesseract_languages
+if not exist "%TESSDATA_DIR%" mkdir "%TESSDATA_DIR%"
+call :download_tessdata eng
+call :download_tessdata chi_sim
+call :download_tessdata chi_tra
+exit /b 0
+
+:download_tessdata
+set "TESS_LANG=%~1"
+set "TESSDATA_FILE=%TESSDATA_DIR%\%TESS_LANG%.traineddata"
+if exist "%TESSDATA_FILE%" (
+  echo [OK] Da co tessdata %TESS_LANG%.
+  exit /b 0
+)
+echo       Tai tessdata %TESS_LANG%...
+call :download_file "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/%TESS_LANG%.traineddata" "%TESSDATA_FILE%"
+if errorlevel 1 (
+  echo [CANH BAO] Khong tai duoc tessdata %TESS_LANG%. OCR ngon ngu nay co the chua chinh xac.
+  exit /b 0
+)
+exit /b 0
+
 :ensure_config
 echo [5/6] Tao/cap nhat config.yaml...
 if not exist "%ROOT%config.yaml" copy /Y "%ROOT%config.example.yaml" "%ROOT%config.yaml" >nul
@@ -243,6 +322,21 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 (
   echo [LOI] FFmpeg khong chay duoc.
   exit /b 1
+)
+if exist "%TESSERACT_EXE%" (
+  "%TESSERACT_EXE%" --version >nul 2>nul
+  if errorlevel 1 (
+    echo [CANH BAO] Tesseract portable ton tai nhung chua chay duoc: %TESSERACT_EXE%
+  ) else (
+    echo [OK] Tesseract OCR portable san sang.
+  )
+) else (
+  where tesseract.exe >nul 2>nul
+  if errorlevel 1 (
+    echo [CANH BAO] Chua tim thay Tesseract OCR. Hay chay: install_all.bat --install-tesseract-only
+  ) else (
+    echo [OK] Tesseract OCR da co trong PATH.
+  )
 )
 echo [OK] Kiem tra thanh cong.
 exit /b 0
