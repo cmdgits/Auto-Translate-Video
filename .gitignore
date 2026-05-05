@@ -22,3 +22,4 @@ tools/*.exe
 # Bỏ qua môi trường và tool nặng
 tools/ffmpeg/
 tools/Python312/
+tools/Tesseract-OCR/

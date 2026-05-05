@@ -234,6 +234,8 @@ if not errorlevel 1 (
 )
 if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" (
   echo [OK] Da co Tesseract OCR: %ProgramFiles%\Tesseract-OCR\tesseract.exe
+  call :copy_tesseract_from_system "%ProgramFiles%\Tesseract-OCR"
+  call :ensure_tesseract_languages
   exit /b 0
 )
 echo [3b/6] Chua co Tesseract, dang tai ban portable UB Mannheim...
@@ -254,12 +256,24 @@ if errorlevel 1 (
 
 echo [3b/6] Dang cai Tesseract portable vao tools\Tesseract-OCR...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $installer='%TESSERACT_INSTALLER%'; $target='%TESSERACT_DIR%'; if(Test-Path $target){Remove-Item -LiteralPath $target -Recurse -Force}; Start-Process -FilePath $installer -ArgumentList @('/S',('/D='+$target)) -Wait"
+if not exist "%TESSERACT_EXE%" if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" (
+  echo [3b/6] Installer da cai vao Program Files, dang copy ve tools\Tesseract-OCR...
+  call :copy_tesseract_from_system "%ProgramFiles%\Tesseract-OCR"
+)
 if not exist "%TESSERACT_EXE%" (
   echo [LOI] Cai Tesseract portable that bai, khong tim thay %TESSERACT_EXE%.
   exit /b 1
 )
 call :ensure_tesseract_languages
 echo [OK] Da cai Tesseract OCR portable.
+exit /b 0
+
+:copy_tesseract_from_system
+set "TESS_SOURCE=%~1"
+if exist "%TESSERACT_EXE%" exit /b 0
+if not exist "%TESS_SOURCE%\tesseract.exe" exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $src='%TESS_SOURCE%'; $dst='%TESSERACT_DIR%'; if(Test-Path $dst){Remove-Item -LiteralPath $dst -Recurse -Force}; Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force"
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :ensure_tesseract_languages
