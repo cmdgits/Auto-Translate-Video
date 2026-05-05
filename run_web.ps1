@@ -2,9 +2,12 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $python = Join-Path $projectRoot "tools\Python312\python.exe"
+if (-not (Test-Path $python)) {
+  $python = Join-Path $projectRoot "tools\Python312\Scripts\python.exe"
+}
 
 if (-not (Test-Path $python)) {
-  Write-Error "Không tìm thấy $python. Hãy kiểm tra thư mục tools\Python312."
+  Write-Error "Không tìm thấy Python local. Hãy chạy install_all.bat trước."
 }
 
 Set-Location $projectRoot

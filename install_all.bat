@@ -7,6 +7,7 @@ set "ROOT=%~dp0"
 set "TOOLS_DIR=%ROOT%tools"
 set "PYTHON_DIR=%TOOLS_DIR%\Python312"
 set "PYTHON_EXE=%PYTHON_DIR%\python.exe"
+set "VENV_PYTHON_EXE=%PYTHON_DIR%\Scripts\python.exe"
 set "PYTHON_VERSION=3.12.10"
 set "PYTHON_INSTALLER=%TOOLS_DIR%\python-%PYTHON_VERSION%-amd64.exe"
 set "PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe"
@@ -15,6 +16,8 @@ set "FFMPEG_BIN=%FFMPEG_DIR%\bin\ffmpeg.exe"
 set "FFPROBE_BIN=%FFMPEG_DIR%\bin\ffprobe.exe"
 set "FFMPEG_ZIP=%TOOLS_DIR%\ffmpeg-release-essentials.zip"
 set "FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+
+call :resolve_python_exe >nul 2>nul
 
 if /I "%~1"=="--verify-only" (
   call :verify_install
@@ -62,25 +65,97 @@ if errorlevel 1 (
 exit /b 0
 
 :ensure_python
+call :resolve_python_exe
 if exist "%PYTHON_EXE%" (
-  echo [OK] Da co Python portable: %PYTHON_EXE%
+  echo [OK] Da co Python local: %PYTHON_EXE%
   exit /b 0
 )
 
 echo [1/6] Chua co Python portable, dang tai Python %PYTHON_VERSION%...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%PYTHON_INSTALLER%'"
+echo       Neu mang chan python.org, co the tai tay file nay vao tools:
+echo       %PYTHON_URL%
+call :download_file "%PYTHON_URL%" "%PYTHON_INSTALLER%"
 if errorlevel 1 (
-  echo [LOI] Khong tai duoc Python. Hay kiem tra internet/firewall roi chay lai.
-  exit /b 1
+  echo [CANH BAO] Khong tai duoc Python portable tu python.org.
+  echo [1/6] Thu dung Python da cai san tren may de tao moi truong local...
+  call :create_venv_from_system_python
+  exit /b !errorlevel!
 )
 
 echo [1/6] Dang cai Python vao tools\Python312, khong can quyen admin...
 start /wait "" "%PYTHON_INSTALLER%" /quiet InstallAllUsers=0 TargetDir="%PYTHON_DIR%" Include_pip=1 Include_launcher=0 PrependPath=0 Shortcuts=0 Include_test=0
 if not exist "%PYTHON_EXE%" (
-  echo [LOI] Cai Python that bai, khong tim thay %PYTHON_EXE%.
-  exit /b 1
+  echo [CANH BAO] Cai Python portable that bai, thu tao venv bang Python da cai san...
+  call :create_venv_from_system_python
+  exit /b !errorlevel!
 )
 echo [OK] Da cai Python portable.
+exit /b 0
+
+:resolve_python_exe
+if exist "%PYTHON_DIR%\python.exe" (
+  set "PYTHON_EXE=%PYTHON_DIR%\python.exe"
+  exit /b 0
+)
+if exist "%VENV_PYTHON_EXE%" (
+  set "PYTHON_EXE=%VENV_PYTHON_EXE%"
+  exit /b 0
+)
+exit /b 1
+
+:download_file
+set "DOWNLOAD_URL=%~1"
+set "DOWNLOAD_OUT=%~2"
+if exist "%DOWNLOAD_OUT%" (
+  echo [OK] Da co file tai ve: %DOWNLOAD_OUT%
+  exit /b 0
+)
+
+where curl.exe >nul 2>nul
+if not errorlevel 1 (
+  echo       Dang tai bang curl, co hien tien trinh...
+  curl.exe -L --fail --connect-timeout 20 --max-time 600 --retry 2 --retry-delay 5 -o "%DOWNLOAD_OUT%" "%DOWNLOAD_URL%"
+  if not errorlevel 1 exit /b 0
+  echo [CANH BAO] curl khong tai duoc, thu PowerShell...
+)
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $url='%DOWNLOAD_URL%'; $out='%DOWNLOAD_OUT%'; $job=Start-Job -ScriptBlock { param($u,$o) $ProgressPreference='Continue'; Invoke-WebRequest -Uri $u -OutFile $o -UseBasicParsing } -ArgumentList $url,$out; if(Wait-Job $job -Timeout 600){ Receive-Job $job -ErrorAction Stop } else { Stop-Job $job -Force; throw 'Qua thoi gian tai file 10 phut' }"
+exit /b %errorlevel%
+
+:create_venv_from_system_python
+set "SYSTEM_PYTHON="
+py -3.12 -c "import sys; sys.exit(0 if (3,11) <= sys.version_info[:2] < (3,15) else 1)" >nul 2>nul
+if not errorlevel 1 set "SYSTEM_PYTHON=py -3.12"
+if not defined SYSTEM_PYTHON (
+  py -3 -c "import sys; sys.exit(0 if (3,11) <= sys.version_info[:2] < (3,15) else 1)" >nul 2>nul
+  if not errorlevel 1 set "SYSTEM_PYTHON=py -3"
+)
+if not defined SYSTEM_PYTHON (
+  python -c "import sys; sys.exit(0 if (3,11) <= sys.version_info[:2] < (3,15) else 1)" >nul 2>nul
+  if not errorlevel 1 set "SYSTEM_PYTHON=python"
+)
+if not defined SYSTEM_PYTHON (
+  echo [LOI] Khong tai duoc Python va may cung chua co Python 3.11-3.14.
+  echo       Cach xu ly nhanh: cai Python 3.12 tu https://www.python.org/downloads/windows/
+  echo       Sau do chay lai install_all.bat.
+  exit /b 1
+)
+echo [OK] Tim thay Python he thong: %SYSTEM_PYTHON%
+if exist "%PYTHON_DIR%" if not exist "%PYTHON_EXE%" if not exist "%VENV_PYTHON_EXE%" (
+  echo       Xoa thu muc Python312 loi/khong day du de tao moi truong moi...
+  rmdir /s /q "%PYTHON_DIR%"
+)
+%SYSTEM_PYTHON% -m venv "%PYTHON_DIR%"
+if errorlevel 1 (
+  echo [LOI] Khong tao duoc moi truong Python local bang venv.
+  exit /b 1
+)
+call :resolve_python_exe
+if not exist "%PYTHON_EXE%" (
+  echo [LOI] Tao venv xong nhung khong tim thay Python local.
+  exit /b 1
+)
+echo [OK] Da tao Python local: %PYTHON_EXE%
 exit /b 0
 
 :ensure_pip

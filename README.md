@@ -59,6 +59,8 @@ run_web.bat
 
 Khi muốn chuyển sang máy khác, copy cả thư mục `Auto-Translate-Video` sang máy mới rồi chạy lại `install_all.bat` nếu máy đó còn thiếu Python, FFmpeg hoặc thư viện.
 
+Nếu `install_all.bat` đứng ở bước tải Python, thường là do mạng hoặc firewall chặn `python.org`. Script mới sẽ tự thử `curl`, có timeout và fallback sang Python đã cài sẵn trên máy. Nếu vẫn không được, hãy tải tay file Python theo link script hiển thị, đặt vào thư mục `tools`, rồi chạy lại `install_all.bat`.
+
 ### 1. Tải mã nguồn
 
 ```powershell
