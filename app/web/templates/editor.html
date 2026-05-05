@@ -179,46 +179,58 @@
           <div class="canvas-controls collapsed" id="canvasControls" aria-label="Điều chỉnh khung video">
             <button class="canvas-controls-toggle" id="canvasControlsToggle" type="button" aria-expanded="false">⚙ Chỉnh</button>
             <div class="canvas-controls-body">
-              <label class="zoom-control">
-                <span>Video</span>
-                <input id="videoZoomRange" type="range" min="60" max="180" step="5" value="100" />
-                <output id="videoZoomValue">100%</output>
-              </label>
-              <label class="zoom-control subtitle-style-control">
-                <span>Cỡ chữ</span>
-                <input id="subtitleSizeRange" type="range" min="8" max="64" step="1" value="32" />
-                <output id="subtitleSizeValue">32px</output>
-              </label>
-              <label class="zoom-control subtitle-style-control cover-mode-control">
-                <span>Ngang</span>
-                <input id="subtitleXRange" type="range" min="10" max="90" step="1" value="50" />
-                <output id="subtitleXValue">50%</output>
-              </label>
-              <label class="zoom-control subtitle-style-control">
-                <span>Cao</span>
-                <input id="subtitleYRange" type="range" min="3" max="45" step="1" value="8" />
-                <output id="subtitleYValue">8%</output>
-              </label>
-              <label class="zoom-control subtitle-style-control">
-                <span>Che chữ gốc</span>
-                <select id="subtitleCoverModeSelect" aria-label="Kiểu che chữ gốc">
-                  <option value="blur" selected>Gaussian Blur</option>
-                  <option value="box">Phủ màu</option>
-                </select>
-                <input id="subtitleCoverRange" type="range" min="0" max="100" step="5" value="72" />
-                <output id="subtitleCoverValue">72%</output>
-              </label>
-              <label class="zoom-control subtitle-style-control">
-                <span>Cao che</span>
-                <input id="subtitleCoverHeightRange" type="range" min="3" max="16" step="1" value="7" />
-                <output id="subtitleCoverHeightValue">7%</output>
-              </label>
-              <label class="zoom-control subtitle-style-control">
-                <span>Rộng che</span>
-                <input id="subtitleCoverWidthRange" type="range" min="28" max="96" step="1" value="86" />
-                <output id="subtitleCoverWidthValue">86%</output>
-              </label>
-              <button class="ghost-button" id="videoFitBtn" type="button">Vừa khung</button>
+              <div class="canvas-control-group">
+                <div class="canvas-control-heading">Khung hình</div>
+                <label class="zoom-control">
+                  <span>Video</span>
+                  <input id="videoZoomRange" type="range" min="60" max="180" step="5" value="100" />
+                  <output id="videoZoomValue">100%</output>
+                </label>
+                <button class="ghost-button video-fit-control" id="videoFitBtn" type="button">Vừa khung</button>
+              </div>
+              <div class="canvas-control-group subtitle-style-control">
+                <div class="canvas-control-heading">Phụ đề</div>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Cỡ chữ</span>
+                  <input id="subtitleSizeRange" type="range" min="8" max="64" step="1" value="32" />
+                  <output id="subtitleSizeValue">32px</output>
+                </label>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Ngang</span>
+                  <input id="subtitleXRange" type="range" min="10" max="90" step="1" value="50" />
+                  <output id="subtitleXValue">50%</output>
+                </label>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Cao</span>
+                  <input id="subtitleYRange" type="range" min="3" max="45" step="1" value="8" />
+                  <output id="subtitleYValue">8%</output>
+                </label>
+              </div>
+              <div class="canvas-control-group subtitle-style-control">
+                <div class="canvas-control-heading">Che chữ gốc</div>
+                <label class="zoom-control subtitle-style-control cover-mode-control select-control">
+                  <span>Kiểu</span>
+                  <select id="subtitleCoverModeSelect" aria-label="Kiểu che chữ gốc">
+                    <option value="blur" selected>Gaussian Blur</option>
+                    <option value="box">Phủ màu</option>
+                  </select>
+                </label>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Mức che</span>
+                  <input id="subtitleCoverRange" type="range" min="0" max="100" step="5" value="72" />
+                  <output id="subtitleCoverValue">72%</output>
+                </label>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Cao che</span>
+                  <input id="subtitleCoverHeightRange" type="range" min="3" max="16" step="1" value="7" />
+                  <output id="subtitleCoverHeightValue">7%</output>
+                </label>
+                <label class="zoom-control subtitle-style-control">
+                  <span>Rộng che</span>
+                  <input id="subtitleCoverWidthRange" type="range" min="28" max="96" step="1" value="86" />
+                  <output id="subtitleCoverWidthValue">86%</output>
+                </label>
+              </div>
             </div>
           </div>
           <div class="render-progress hidden" id="renderProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-live="polite">

@@ -679,7 +679,7 @@ button {
   z-index: 4;
   display: grid;
   justify-items: end;
-  max-width: min(860px, calc(100vw - 120px));
+  max-width: min(420px, calc(100vw - 120px));
   pointer-events: none;
 }
 
@@ -701,20 +701,37 @@ button {
   top: calc(100% + 8px);
   right: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  align-items: center;
-  gap: 8px 10px;
-  width: min(760px, calc(100vw - 40px));
-  max-height: 240px;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  width: min(360px, calc(100vw - 40px));
+  max-height: min(62vh, 520px);
   margin-top: 0;
-  padding: 12px;
-  overflow: auto;
+  padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid rgba(221, 227, 234, 0.9);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
   pointer-events: auto;
+}
+
+.canvas-control-group {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.canvas-control-heading {
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .canvas-controls.collapsed .canvas-controls-body {
@@ -723,17 +740,17 @@ button {
 
 .zoom-control {
   display: grid;
-  grid-template-columns: 60px minmax(74px, 1fr) 44px;
+  grid-template-columns: 64px minmax(112px, 1fr) 48px;
   align-items: center;
-  gap: 7px;
-  min-height: 30px;
-  padding: 5px 8px;
-  border: 1px solid rgba(226, 232, 240, 0.72);
-  border-radius: 12px;
-  background: rgba(248, 250, 252, 0.78);
+  gap: 8px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #475569;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11.5px;
+  font-weight: 850;
   white-space: nowrap;
   min-width: 0;
 }
@@ -771,12 +788,12 @@ button {
 .zoom-control select {
   width: 100%;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 5px 8px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 10px;
   background: #fff;
   color: #0f172a;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
 }
 
@@ -789,7 +806,8 @@ button {
   display: none;
 }
 
-body.subtitle-style-mode .subtitle-style-control {
+body.subtitle-style-mode .zoom-control.subtitle-style-control,
+body.subtitle-style-mode .canvas-control-group.subtitle-style-control {
   display: grid;
 }
 
@@ -802,8 +820,7 @@ body.subtitle-style-mode .subtitle-style-control {
 }
 
 .cover-mode-control {
-  grid-template-columns: 74px minmax(94px, 1fr) minmax(72px, 1fr) 44px;
-  grid-column: span 2;
+  grid-template-columns: 64px minmax(112px, 1fr);
 }
 
 .cover-mode-control > span {
@@ -813,6 +830,16 @@ body.subtitle-style-mode .subtitle-style-control {
 
 .cover-mode-control select {
   min-width: 0;
+}
+
+.select-control output {
+  display: none;
+}
+
+.video-fit-control {
+  width: 100%;
+  min-height: 32px;
+  border-radius: 12px;
 }
 
 .canvas-title {
@@ -1824,13 +1851,9 @@ body.dragging * {
 
   .canvas-controls-body {
     grid-template-columns: 1fr;
-    width: min(420px, calc(100vw - 24px));
+    width: min(360px, calc(100vw - 24px));
     justify-content: flex-start;
-    max-height: 220px;
-  }
-
-  .cover-mode-control {
-    grid-column: span 1;
+    max-height: min(62vh, 520px);
   }
 
   .canvas-frame {
