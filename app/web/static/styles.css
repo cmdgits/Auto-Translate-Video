@@ -1,3 +1,5 @@
+@import url('https://fonts.cdnfonts.com/css/sf-pro-display');
+
 :root {
   --bg: #050505;
   --panel-dark: rgba(20, 20, 25, 0.45);
@@ -6,7 +8,7 @@
   --panel-soft: rgba(255, 255, 255, 0.08);
   --line: rgba(255, 255, 255, 0.2);
   --line-dark: rgba(255, 255, 255, 0.06);
-  --text: #ffffff;
+  --text: rgba(255, 255, 255, 0.9);
   --muted: #ebebf5;
   --muted-dark: rgba(235, 235, 245, 0.6);
   --accent: #ffffff;
@@ -19,7 +21,7 @@
   --radius: 20px;
   --radius-sm: 12px;
   --transition: 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -41,6 +43,8 @@ body {
               radial-gradient(circle at 50% 80%, rgba(48, 209, 88, 0.15), transparent 40%),
               var(--bg);
   color: var(--text);
+  font-family: inherit;
+  letter-spacing: -0.015em;
 }
 
 button,
