@@ -26,7 +26,7 @@ from app.subtitles.srt_writer import write_srt
 if sys.version_info >= (3, 14):
     raise RuntimeError(
         "Dang chay web bang Python 3.14 nen faster-whisper/ctranslate2 se loi tren Windows. "
-        "Hay dung .\\run_web.bat hoac tools\\Python312\\python.exe -m app.main web --host 127.0.0.1 --port 8001"
+        "Hay dung .\\run_web.bat hoac tools\\Python312\\python.exe -m app.main web --host 127.0.0.1 --port 8002"
     )
 
 WEB_ROOT = Path(__file__).resolve().parent

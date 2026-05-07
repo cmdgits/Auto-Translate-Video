@@ -1779,6 +1779,47 @@ function renderJobList(jobs) {
   jobs.slice(0, 12).forEach((job) => {
     const item = document.createElement("div");
     item.className = "job-item";
+    }
+    return;
+  }
+  state.previewMode = mode;
+  state.previewSourceMode = sourceMode;
+  updatePreviewSource(targetUrl);
+  videoPreview.style.display = "block";
+  emptyState.style.display = "none";
+  setPreviewButtons();
+  updateVideoPlaybackControls();
+  applyPlaybackHighlight(videoPreview.currentTime || 0);
+}
+
+function renderArtifactLinks(job) {
+  const canRenderVideo = Boolean(job.downloads?.transcript_json && !["queued", "running"].includes(job.status));
+  setSubtitleDownloadAction(sourceSrtLink, Boolean(state.segments.length), "Lưu phụ đề gốc đang hiển thị");
+  setSubtitleDownloadAction(srtLink, Boolean(state.segments.length), "Lưu phụ đề dịch/đã sửa đang hiển thị");
+  setDownloadLink(vttLink, job.downloads?.subtitle_vtt);
+  setDownloadLink(jsonLink, job.downloads?.transcript_json);
+  setRenderActionLink(hardsubLink, canRenderVideo, "Xuất lại MP4 phụ đề từ nội dung đang sửa");
+  const extraTrackCount = state.extraSubtitleTracks.length;
+  setRenderActionLink(
+    softsubLink,
+    canRenderVideo,
+    extraTrackCount
+      ? `Xuất MKV softsub gồm phụ đề gốc, tiếng Việt và ${extraTrackCount} track thêm`
+      : "Xuất MKV softsub gồm phụ đề gốc và phụ đề tiếng Việt",
+  );
+  setRenderActionLink(voiceoverLink, canRenderVideo, "Xuất lại MP4 thuyết minh từ phụ đề đang sửa");
+}
+
+function renderJobList(jobs) {
+  jobList.innerHTML = "";
+  if (!jobs?.length) {
+    jobList.innerHTML = '<div class="script-empty">Tác vụ đang chờ sẽ hiện ở đây.</div>';
+    return;
+  }
+
+  jobs.slice(0, 12).forEach((job) => {
+    const item = document.createElement("div");
+    item.className = "job-item";
     item.dataset.id = job.job_id;
     if (job.job_id === state.jobId) {
       item.classList.add("selected");
@@ -1810,63 +1851,71 @@ function drawWaveform() {
   const pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   const canvasWidth = Math.round(width * pixelRatio);
   const canvasHeight = Math.round(height * pixelRatio);
-  if (timelineWaveform.width !== canvasWidth) {
-    timelineWaveform.width = canvasWidth;
-  }
-  if (timelineWaveform.height !== canvasHeight) {
-    timelineWaveform.height = canvasHeight;
-  }
+  if (timelineWaveform.width !== canvasWidth) timelineWaveform.width = canvasWidth;
+  if (timelineWaveform.height !== canvasHeight) timelineWaveform.height = canvasHeight;
   timelineWaveform.style.width = `${width}px`;
   timelineWaveform.style.height = `${height}px`;
   const context = timelineWaveform.getContext("2d");
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = "#f0fdf4";
-  context.fillRect(0, 0, width, height);
-  const gradient = context.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(0.56, "#ecfdf5");
-  gradient.addColorStop(1, "#bbf7d0");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
+
   const peaks = state.waveform?.peaks || [];
   if (!peaks.length) {
-    context.fillStyle = "#475569";
-    context.font = "700 12px system-ui";
-    context.fillText(state.waveformLoading ? "Đang tải waveform..." : "Chưa có waveform", 12, Math.round(height / 2) + 4);
+    context.fillStyle = "rgba(161, 161, 170, 0.8)";
+    context.font = "600 12px system-ui";
+    context.fillText(state.waveformLoading ? "Đang tải waveform..." : "Chưa có waveform", 16, Math.round(height / 2) + 4);
     return;
   }
   const centerY = height / 2;
-  context.strokeStyle = "rgba(15, 23, 42, 0.13)";
+  context.strokeStyle = "rgba(6, 182, 212, 0.4)";
   context.lineWidth = 1;
-  [0.25, 0.5, 0.75].forEach((ratio) => {
-    const y = Math.round(height * ratio) + 0.5;
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
-    context.stroke();
-  });
-  context.strokeStyle = "rgba(15, 23, 42, 0.28)";
-  context.lineWidth = 1;
+  context.shadowBlur = 4;
+  context.shadowColor = "rgba(6, 182, 212, 0.8)";
   context.beginPath();
   context.moveTo(0, centerY);
   context.lineTo(width, centerY);
   context.stroke();
+  context.shadowBlur = 0;
+
   const maxPeak = Math.max(...peaks.map((peak) => Number(peak || 0)).filter(Number.isFinite), 0.01);
   const step = width / peaks.length;
-  const barWidth = Math.max(1.5, Math.min(4, step * 0.68));
+  const barWidth = Math.max(2, Math.min(6, step * 0.75));
+
   const waveformGradient = context.createLinearGradient(0, 0, 0, height);
-  waveformGradient.addColorStop(0, "#86efac");
-  waveformGradient.addColorStop(0.45, "#16a34a");
-  waveformGradient.addColorStop(1, "#15803d");
+  waveformGradient.addColorStop(0, "#3b82f6");
+  waveformGradient.addColorStop(0.3, "#06b6d4");
+  waveformGradient.addColorStop(0.7, "#06b6d4");
+  waveformGradient.addColorStop(1, "#3b82f6");
+
   context.fillStyle = waveformGradient;
+  context.shadowBlur = 6;
+  context.shadowColor = "rgba(6, 182, 212, 0.4)";
+
   peaks.forEach((peak, index) => {
     const x = Math.round(index * step - barWidth / 2);
     const normalizedPeak = Math.max(0, Math.min(1, Number(peak || 0) / maxPeak));
-    const boostedPeak = Math.pow(normalizedPeak, 0.55);
-    const amplitude = Math.max(2.5, boostedPeak * (height * 0.46));
-    context.fillRect(x, centerY - amplitude, barWidth, amplitude * 2);
+    const boostedPeak = Math.pow(normalizedPeak, 0.6);
+    const amplitude = Math.max(2.5, boostedPeak * (height * 0.42));
+    if (context.roundRect) {
+      context.beginPath();
+      context.roundRect(x, centerY - amplitude, barWidth, amplitude * 2, barWidth / 2);
+      context.fill();
+    } else {
+      context.fillRect(x, centerY - amplitude, barWidth, amplitude * 2);
+    }
   });
+  context.shadowBlur = 0;
+
+
+
+
+
+
+
+
+
+
+
 }
 
 async function loadWaveform(jobId) {

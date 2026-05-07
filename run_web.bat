@@ -10,4 +10,4 @@ if not exist "%PYTHON_EXE%" (
   pause
   exit /b 1
 )
-"%PYTHON_EXE%" -m app.main web --host 127.0.0.1 --port 8001
+"%PYTHON_EXE%" -m app.main web --host 127.0.0.1 --port 8002
