@@ -97,3 +97,28 @@ def run_ffmpeg_process(
         raise ProcessError(error_tail or f"Lenh that bai: {' '.join(command)}")
     progress_callback(1.0)
     return "".join(output_lines).strip()
+
+
+_AVAILABLE_ENCODERS_CACHE: set[str] | None = None
+
+
+def get_available_video_encoders(ffmpeg_bin: str) -> set[str]:
+    global _AVAILABLE_ENCODERS_CACHE
+    if _AVAILABLE_ENCODERS_CACHE is not None:
+        return _AVAILABLE_ENCODERS_CACHE
+
+    try:
+        binary = ensure_binary(ffmpeg_bin)
+        output = run_process([binary, "-encoders"])
+        encoders = set()
+        for line in output.splitlines():
+            line = line.strip()
+            if line.startswith("V") and len(line) > 6:
+                parts = line[6:].split()
+                if parts:
+                    encoders.add(parts[0])
+        _AVAILABLE_ENCODERS_CACHE = encoders
+        return encoders
+    except Exception:
+        _AVAILABLE_ENCODERS_CACHE = set()
+        return _AVAILABLE_ENCODERS_CACHE

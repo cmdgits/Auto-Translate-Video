@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from app.config import RenderConfig
-from app.media.ffmpeg import ensure_binary, run_ffmpeg_process
-
+from app.media.ffmpeg import ensure_binary, run_ffmpeg_process, get_available_video_encoders
 
 def escape_subtitle_filter_path(path: Path) -> str:
     escaped = path.resolve().as_posix()
@@ -57,8 +56,22 @@ def build_hardsub_filter(subtitle_path: Path, render_config: RenderConfig) -> st
     return f"{cover_filter},{subtitle_filter}"
 
 
-def video_encode_args(render_config: RenderConfig) -> list[str]:
-    codec = str(render_config.video_codec or "libx264").strip().lower()
+def select_video_codec(render_config: RenderConfig, ffmpeg_bin: str) -> str:
+    codec = str(render_config.video_codec or "auto").strip().lower()
+    if codec != "auto":
+        return codec
+
+    available = get_available_video_encoders(ffmpeg_bin)
+    if "h264_nvenc" in available:
+        return "h264_nvenc"
+    if "h264_qsv" in available:
+        return "h264_qsv"
+    if "h264_amf" in available:
+        return "h264_amf"
+    return "libx264"
+
+
+def video_encode_args(render_config: RenderConfig, codec: str) -> list[str]:
     preset = str(render_config.preset or "medium").strip()
     quality = str(render_config.crf)
     args = ["-c:v", codec]
@@ -99,27 +112,42 @@ def burn_subtitles_into_video(
     output_video.parent.mkdir(parents=True, exist_ok=True)
     subtitle_filter = build_hardsub_filter(subtitle_path, render_config)
     filter_graph = f"[0:v]{subtitle_filter}[v]"
-    command = [
-        ensure_binary(ffmpeg_bin),
-        "-y",
-        "-i",
-        str(input_video),
-        "-filter_complex",
-        filter_graph,
-        "-map",
-        "[v]",
-        "-map",
-        "0:a?",
-        *video_encode_args(render_config),
-        "-c:a",
-        render_config.audio_codec,
-        "-b:a",
-        render_config.audio_bitrate,
-        "-movflags",
-        "+faststart",
-        str(output_video),
-    ]
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
+    codec = select_video_codec(render_config, ffmpeg_bin)
+
+    def _build_command(current_codec: str):
+        return [
+            ensure_binary(ffmpeg_bin),
+            "-y",
+            "-i",
+            str(input_video),
+            "-filter_complex",
+            filter_graph,
+            "-map",
+            "[v]",
+            "-map",
+            "0:a?",
+            *video_encode_args(render_config, current_codec),
+            "-c:a",
+            render_config.audio_codec,
+            "-b:a",
+            render_config.audio_bitrate,
+            "-movflags",
+            "+faststart",
+            str(output_video),
+        ]
+
+    try:
+        run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
+    except Exception as e:
+        from app.core.exceptions import ProcessError
+        if isinstance(e, ProcessError) and codec in {"h264_nvenc", "h264_qsv", "h264_amf"}:
+            import logging
+            logging.getLogger(__name__).warning(f"GPU rendering with {codec} failed, falling back to libx264 CPU rendering. Error: {e}")
+            if output_video.exists():
+                output_video.unlink(missing_ok=True)
+            run_ffmpeg_process(_build_command("libx264"), duration_sec=duration_sec, progress_callback=progress_callback)
+        else:
+            raise e
     return output_video
 
 
@@ -171,37 +199,54 @@ def mux_subtitle_tracks_into_video(
         raise ValueError("Cần ít nhất một track phụ đề để mux softsub.")
     output_video.parent.mkdir(parents=True, exist_ok=True)
     subtitle_codec = "srt" if output_video.suffix.lower() == ".mkv" else "mov_text"
-    command = [ensure_binary(ffmpeg_bin), "-y", "-i", str(input_video)]
-    for subtitle_path, _, _ in subtitle_tracks:
-        command.extend(["-i", str(subtitle_path)])
     cover_filter = build_original_subtitle_cover_filter(render_config)
-    if cover_filter:
-        command.extend(["-filter_complex", f"[0:v]{cover_filter}[v]"])
-        command.extend(["-map", "[v]", "-map", "0:a?"])
-    else:
-        command.extend(["-map", "0:v:0", "-map", "0:a?"])
-    for index in range(len(subtitle_tracks)):
-        command.extend(["-map", f"{index + 1}:0"])
-    if cover_filter:
-        command.extend([
-            *video_encode_args(render_config),
-            "-c:a",
-            "copy",
-            "-c:s",
-            subtitle_codec,
-        ])
-    else:
-        command.extend(["-c:v", "copy", "-c:a", "copy", "-c:s", subtitle_codec])
-    default_subtitle_index = max(0, min(default_subtitle_index, len(subtitle_tracks) - 1))
-    for index, (_, language, title) in enumerate(subtitle_tracks):
-        command.extend(["-metadata:s:s:" + str(index), f"language={language or 'und'}"])
-        if title:
-            command.extend(["-metadata:s:s:" + str(index), f"title={title}"])
-        command.extend(["-disposition:s:" + str(index), "default+forced" if index == default_subtitle_index else "0"])
-    if output_video.suffix.lower() != ".mkv":
-        command.extend(["-movflags", "+faststart"])
-    command.append(str(output_video))
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
+    codec = select_video_codec(render_config, ffmpeg_bin) if cover_filter else "copy"
+
+    def _build_command(current_codec: str):
+        command = [ensure_binary(ffmpeg_bin), "-y", "-i", str(input_video)]
+        for subtitle_path, _, _ in subtitle_tracks:
+            command.extend(["-i", str(subtitle_path)])
+        
+        if cover_filter:
+            command.extend(["-filter_complex", f"[0:v]{cover_filter}[v]"])
+            command.extend(["-map", "[v]", "-map", "0:a?"])
+        else:
+            command.extend(["-map", "0:v:0", "-map", "0:a?"])
+        for index in range(len(subtitle_tracks)):
+            command.extend(["-map", f"{index + 1}:0"])
+        if cover_filter:
+            command.extend([
+                *video_encode_args(render_config, current_codec),
+                "-c:a",
+                "copy",
+                "-c:s",
+                subtitle_codec,
+            ])
+        else:
+            command.extend(["-c:v", "copy", "-c:a", "copy", "-c:s", subtitle_codec])
+        default_subtitle_index_safe = max(0, min(default_subtitle_index, len(subtitle_tracks) - 1))
+        for index, (_, language, title) in enumerate(subtitle_tracks):
+            command.extend(["-metadata:s:s:" + str(index), f"language={language or 'und'}"])
+            if title:
+                command.extend(["-metadata:s:s:" + str(index), f"title={title}"])
+            command.extend(["-disposition:s:" + str(index), "default+forced" if index == default_subtitle_index_safe else "0"])
+        if output_video.suffix.lower() != ".mkv":
+            command.extend(["-movflags", "+faststart"])
+        command.append(str(output_video))
+        return command
+
+    try:
+        run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
+    except Exception as e:
+        from app.core.exceptions import ProcessError
+        if isinstance(e, ProcessError) and codec in {"h264_nvenc", "h264_qsv", "h264_amf"}:
+            import logging
+            logging.getLogger(__name__).warning(f"GPU rendering with {codec} failed, falling back to libx264 CPU rendering. Error: {e}")
+            if output_video.exists():
+                output_video.unlink(missing_ok=True)
+            run_ffmpeg_process(_build_command("libx264"), duration_sec=duration_sec, progress_callback=progress_callback)
+        else:
+            raise e
     return output_video
 
 
@@ -218,6 +263,8 @@ def build_mux_subtitle_tracks_command_string(
     for subtitle_path, _, _ in subtitle_tracks:
         command.extend(["-i", str(subtitle_path)])
     cover_filter = build_original_subtitle_cover_filter(render_config)
+    codec = select_video_codec(render_config, ffmpeg_bin) if cover_filter else "copy"
+
     if cover_filter:
         command.extend(["-filter_complex", f"[0:v]{cover_filter}[v]"])
         command.extend(["-map", "[v]", "-map", "0:a?"])
@@ -227,7 +274,7 @@ def build_mux_subtitle_tracks_command_string(
         command.extend(["-map", f"{index + 1}:0"])
     if cover_filter:
         command.extend([
-            *video_encode_args(render_config),
+            *video_encode_args(render_config, codec),
             "-c:a",
             "copy",
             "-c:s",
@@ -235,12 +282,12 @@ def build_mux_subtitle_tracks_command_string(
         ])
     else:
         command.extend(["-c:v", "copy", "-c:a", "copy", "-c:s", subtitle_codec])
-    default_subtitle_index = max(0, min(default_subtitle_index, len(subtitle_tracks) - 1))
+    default_subtitle_index_safe = max(0, min(default_subtitle_index, len(subtitle_tracks) - 1))
     for index, (_, language, title) in enumerate(subtitle_tracks):
         command.extend(["-metadata:s:s:" + str(index), f"language={language or 'und'}"])
         if title:
             command.extend(["-metadata:s:s:" + str(index), f"title={title}"])
-        command.extend(["-disposition:s:" + str(index), "default+forced" if index == default_subtitle_index else "0"])
+        command.extend(["-disposition:s:" + str(index), "default+forced" if index == default_subtitle_index_safe else "0"])
     if output_video.suffix.lower() != ".mkv":
         command.extend(["-movflags", "+faststart"])
     command.append(str(output_video))

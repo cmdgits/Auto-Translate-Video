@@ -111,7 +111,7 @@ class RenderConfig(BaseModel):
 
     encoder: str = "auto"
     quality_preset: str = "balanced"
-    video_codec: str = "libx264"
+    video_codec: str = "auto"
     preset: str = "medium"
     crf: int = 20
     audio_codec: str = "aac"
