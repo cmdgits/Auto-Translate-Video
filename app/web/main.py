@@ -297,9 +297,11 @@ async def _create_queued_job(file: UploadFile, options: PipelineRunOptions) -> J
     if not file.filename:
         raise HTTPException(status_code=400, detail="Khong co ten file upload.")
 
+    import re
     pipeline = get_pipeline()
     context = pipeline.create_job_context(file.filename, Path(file.filename))
-    saved_path = context.input_dir / Path(file.filename).name
+    safe_name = re.sub(r'[\\/*?:"<>|]', "_", Path(file.filename).name)
+    saved_path = context.input_dir / safe_name
     context.input_video = saved_path
 
     saved_path.parent.mkdir(parents=True, exist_ok=True)

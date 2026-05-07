@@ -48,9 +48,11 @@ class JobManager:
         input_video: Path,
         output_root: Path | None = None,
     ) -> JobContext:
+        import re
         jobs_root = output_root or self.jobs_root
         jobs_root.mkdir(parents=True, exist_ok=True)
-        safe_stem = Path(input_name).stem.strip() or "video"
+        raw_stem = Path(input_name).stem.strip() or "video"
+        safe_stem = re.sub(r'[\\/*?:"<>|]', "_", raw_stem)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_id = f"{safe_stem}_{timestamp}"
         root_dir = jobs_root / job_id

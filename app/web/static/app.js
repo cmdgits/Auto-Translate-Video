@@ -1304,7 +1304,7 @@ function appendApiSettings(payload) {
 
 function appendSubtitleStyle(payload) {
   Object.entries(subtitleStylePayload()).forEach(([key, value]) => {
-    payload.set(key, String(value));
+    if (value !== null && value !== undefined && !Number.isNaN(value)) payload.set(key, String(value));
   });
 }
 
