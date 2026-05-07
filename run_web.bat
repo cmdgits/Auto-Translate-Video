@@ -11,3 +11,8 @@ if not exist "%PYTHON_EXE%" (
   exit /b 1
 )
 "%PYTHON_EXE%" -m app.main web --host 127.0.0.1 --port 8002
+if errorlevel 1 (
+  echo.
+  echo [LOI] Server bi crash hoac tat dot ngot. Hay doc thong bao loi ben tren.
+  pause
+)
