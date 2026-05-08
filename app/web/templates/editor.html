@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=fix-toolbar-order-20260508" />
+    <link rel="stylesheet" href="/static/styles.css?v=fix-subtitle-ass-anchor-20260508" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -131,7 +131,7 @@
                 <div class="canvas-control-heading">Phụ đề</div>
                 <label class="zoom-control subtitle-style-control">
                   <span>Cỡ chữ</span>
-                  <input id="subtitleSizeRange" type="range" min="8" max="64" step="1" value="32" />
+                  <input id="subtitleSizeRange" type="range" min="8" max="120" step="1" value="32" />
                   <output id="subtitleSizeValue">32px</output>
                 </label>
                 <label class="zoom-control subtitle-style-control">
@@ -200,7 +200,13 @@
           <div class="canvas-frame" id="canvasFrame">
             <video id="videoPreview" preload="metadata"></video>
             <div class="original-subtitle-cover hidden" id="originalSubtitleCover"></div>
-            <div class="subtitle-overlay hidden" id="subtitleOverlay"></div>
+            <div class="subtitle-overlay hidden" id="subtitleOverlay">
+              <span class="subtitle-overlay-text" id="subtitleOverlayText"></span>
+              <button class="subtitle-resize-handle resize-nw" type="button" data-subtitle-resize-corner="nw" aria-label="Kéo góc trên trái để chỉnh khung phụ đề"></button>
+              <button class="subtitle-resize-handle resize-ne" type="button" data-subtitle-resize-corner="ne" aria-label="Kéo góc trên phải để chỉnh khung phụ đề"></button>
+              <button class="subtitle-resize-handle resize-sw" type="button" data-subtitle-resize-corner="sw" aria-label="Kéo góc dưới trái để chỉnh khung phụ đề"></button>
+              <button class="subtitle-resize-handle resize-se" type="button" data-subtitle-resize-corner="se" aria-label="Kéo góc dưới phải để chỉnh khung phụ đề"></button>
+            </div>
             <div class="empty-state" id="emptyState">
               <strong>Tải video lên để bắt đầu</strong>
               <span>Video xem trước sẽ hiển thị tại đây.</span>
@@ -414,6 +420,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=fix-toolbar-order-20260508" defer></script>
+    <script src="/static/app.js?v=fix-subtitle-ass-anchor-20260508" defer></script>
   </body>
 </html>

@@ -29,13 +29,14 @@ def escape_ass_text(value: str) -> str:
     )
 
 
-def wrap_ass_text(value: str, font_size: int, box_width_ratio: float) -> str:
+def wrap_ass_text(value: str, font_size: int, box_width_ratio: float, play_res_x: int = PLAY_RES_X) -> str:
     text = value.strip()
     if not text:
         return ""
 
     safe_box_width = max(0.1, min(1.0, float(box_width_ratio)))
-    approx_chars_per_line = max(8, min(120, int((PLAY_RES_X * safe_box_width) / max(font_size * 0.58, 1))))
+    safe_play_res_x = max(1, int(play_res_x or PLAY_RES_X))
+    approx_chars_per_line = max(8, min(120, int((safe_play_res_x * safe_box_width) / max(font_size * 0.58, 1))))
     wrapped_lines: list[str] = []
     for manual_line in text.split("\n"):
         line = manual_line.strip()
@@ -94,18 +95,23 @@ def write_ass(
     bottom_percent: float = 8,
     auto_wrap_chars_per_line: int = 42,
     auto_wrap_max_lines: int = 2,
+    play_res_x: int = PLAY_RES_X,
+    play_res_y: int = PLAY_RES_Y,
 ) -> Path:
-    safe_font_size = max(8, min(64, int(round(font_size))))
+    safe_play_res_x = max(1, int(play_res_x or PLAY_RES_X))
+    safe_play_res_y = max(1, int(play_res_y or PLAY_RES_Y))
+    base_font_size = max(8, min(120, float(font_size)))
+    safe_font_size = max(4, min(256, int(round(base_font_size * safe_play_res_y / PLAY_RES_Y))))
     safe_x = max(0.0, min(100.0, float(position_x_percent)))
     safe_bottom = max(0.0, min(100.0, float(bottom_percent)))
-    position_x = round(PLAY_RES_X * safe_x / 100)
-    position_y = round(PLAY_RES_Y * (1 - safe_bottom / 100))
+    position_x = round(safe_play_res_x * safe_x / 100)
+    position_y = round(safe_play_res_y * (1 - safe_bottom / 100))
 
     lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        f"PlayResX: {PLAY_RES_X}",
-        f"PlayResY: {PLAY_RES_Y}",
+        f"PlayResX: {safe_play_res_x}",
+        f"PlayResY: {safe_play_res_y}",
         "ScaledBorderAndShadow: yes",
         "",
         "[V4+ Styles]",
@@ -113,7 +119,7 @@ def write_ass(
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         "Style: Default,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H64000000,"
-        "-1,0,0,0,100,100,0,0,1,3,1,2,20,20,20,1".format(font_size=safe_font_size),
+        "-1,0,0,0,100,100,0,0,1,3,1,2,20,20,0,1".format(font_size=safe_font_size),
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -125,12 +131,13 @@ def write_ass(
                 render_text_for_segment(segment, auto_wrap_chars_per_line, auto_wrap_max_lines),
                 safe_font_size,
                 box_width_ratio,
+                safe_play_res_x,
             )
         )
         if not subtitle_text:
             continue
         lines.append(
-            "Dialogue: 0,{start},{end},Default,,0,0,0,,{{\\pos({x},{y})}}{text}".format(
+            "Dialogue: 0,{start},{end},Default,,0,0,0,,{{\\an2\\pos({x},{y})}}{text}".format(
                 start=format_ass_timestamp(segment.start),
                 end=format_ass_timestamp(segment.end),
                 x=position_x,

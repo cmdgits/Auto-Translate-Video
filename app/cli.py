@@ -48,7 +48,7 @@ def process(
     voice_name: str | None = typer.Option(None, help="Ten voice edge-tts, vi du vi-VN-HoaiMyNeural."),
     voiceover_gain: float | None = typer.Option(None, help="Muc am luong kenh voice-over."),
     background_audio_gain: float | None = typer.Option(None, help="Muc am luong kenh audio goc khi mix voice-over."),
-    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-120."),
     subtitle_box_width_ratio: float | None = typer.Option(None, help="Do rong dong phu de, 0.1-1.0."),
     subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
     subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),
@@ -128,7 +128,7 @@ def inspect(
 def render_hardsub(
     job_id: str = typer.Option(..., help="Job ID da co transcript/subtitle."),
     config: Path | None = typer.Option(None, help="Duong dan config YAML."),
-    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-64."),
+    subtitle_font_size: float | None = typer.Option(None, help="Co chu phu de khi render hardsub, 8-120."),
     subtitle_box_width_ratio: float | None = typer.Option(None, help="Do rong dong phu de, 0.1-1.0."),
     subtitle_position_x: float | None = typer.Option(None, help="Vi tri ngang phu de khi render hardsub, 0-100."),
     subtitle_position_y: float | None = typer.Option(None, help="Vi tri doc phu de tinh tu duoi len, 0-100."),

@@ -530,7 +530,7 @@ button {
 
 .editor-main {
   display: grid;
-  grid-template-rows: auto minmax(260px, 1fr) auto 292px;
+  grid-template-rows: auto minmax(280px, 1fr) auto clamp(178px, 24vh, 232px);
   min-width: 0;
   height: calc(100vh - 32px);
   border-radius: var(--radius);
@@ -544,6 +544,7 @@ button {
 
 .topbar {
   position: relative;
+  z-index: 30;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -719,53 +720,55 @@ button {
 
 .canvas-controls {
   position: relative;
-  z-index: 4;
+  z-index: 40;
   display: grid;
   justify-items: end;
-  max-width: min(420px, calc(100vw - 120px));
+  max-width: min(320px, calc(100vw - 96px));
   pointer-events: none;
 }
 
 .canvas-controls-toggle {
-  min-height: 32px;
-  padding: 0 12px;
+  min-height: 28px;
+  padding: 0 10px;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.88);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   pointer-events: auto;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .canvas-controls-body {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
-  width: min(360px, calc(100vw - 40px));
-  max-height: min(62vh, 520px);
+  gap: 6px;
+  width: min(300px, calc(100vw - 32px));
+  max-height: min(42vh, 320px);
   margin-top: 0;
-  padding: 10px;
+  padding: 8px;
   overflow-y: auto;
   overflow-x: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgba(24, 24, 27, 0.75);
   backdrop-filter: blur(16px);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
   pointer-events: auto;
+  z-index: 45;
 }
 
 .canvas-control-group {
   display: grid;
-  gap: 7px;
-  padding: 9px;
+  gap: 5px;
+  padding: 7px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--panel);
 }
 
@@ -783,16 +786,16 @@ button {
 
 .zoom-control {
   display: grid;
-  grid-template-columns: 64px minmax(112px, 1fr) 48px;
+  grid-template-columns: 56px minmax(88px, 1fr) 38px;
   align-items: center;
-  gap: 8px;
-  min-height: 28px;
+  gap: 6px;
+  min-height: 24px;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 850;
   white-space: nowrap;
   min-width: 0;
@@ -831,12 +834,12 @@ button {
 .zoom-control select {
   width: 100%;
   min-width: 0;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel-dark);
   color: var(--text);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -872,7 +875,7 @@ body.subtitle-style-mode.cover-mode-box .zoom-control.cover-box-control {
 }
 
 .cover-mode-control {
-  grid-template-columns: 64px minmax(112px, 1fr);
+  grid-template-columns: 56px minmax(88px, 1fr);
 }
 
 .cover-mode-control > span {
@@ -890,8 +893,8 @@ body.subtitle-style-mode.cover-mode-box .zoom-control.cover-box-control {
 
 .video-fit-control {
   width: 100%;
-  min-height: 32px;
-  border-radius: 12px;
+  min-height: 28px;
+  border-radius: 10px;
 }
 
 .canvas-title {
@@ -984,15 +987,19 @@ body.resizing-canvas * {
 
 .subtitle-overlay {
   position: absolute;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   left: 50%;
   right: auto;
   bottom: 8%;
   padding: 10px 16px;
   color: #fff;
   text-align: center;
+  font-family: Arial, Helvetica, sans-serif;
   font-weight: 900;
   font-size: 32px;
-  line-height: 1.25;
+  line-height: 1.05;
   text-shadow: 0 3px 8px #000, 0 0 2px #000;
   pointer-events: auto;
   transform: translateX(-50%);
@@ -1002,6 +1009,81 @@ body.resizing-canvas * {
   cursor: move;
   user-select: none;
   z-index: 3;
+}
+
+.subtitle-overlay-text {
+  display: block;
+  min-width: 1ch;
+}
+
+.subtitle-resize-handle {
+  position: absolute;
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 7px;
+  background: linear-gradient(135deg, #ffffff, #dbeafe);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  text-shadow: none;
+}
+
+.subtitle-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  width: 8px;
+  height: 8px;
+  border: 0;
+}
+
+.subtitle-resize-handle.resize-nw {
+  top: -10px;
+  left: -10px;
+  cursor: nwse-resize;
+}
+
+.subtitle-resize-handle.resize-ne {
+  top: -10px;
+  right: -10px;
+  cursor: nesw-resize;
+}
+
+.subtitle-resize-handle.resize-sw {
+  bottom: -10px;
+  left: -10px;
+  cursor: nesw-resize;
+}
+
+.subtitle-resize-handle.resize-se {
+  right: -10px;
+  bottom: -10px;
+  cursor: nwse-resize;
+}
+
+.subtitle-resize-handle.resize-nw::before {
+  border-left: 2px solid #0f172a;
+  border-top: 2px solid #0f172a;
+}
+
+.subtitle-resize-handle.resize-ne::before {
+  border-right: 2px solid #0f172a;
+  border-top: 2px solid #0f172a;
+}
+
+.subtitle-resize-handle.resize-sw::before {
+  border-left: 2px solid #0f172a;
+  border-bottom: 2px solid #0f172a;
+}
+
+.subtitle-resize-handle.resize-se::before {
+  border-right: 2px solid #0f172a;
+  border-bottom: 2px solid #0f172a;
+}
+
+body.subtitle-style-mode .subtitle-resize-handle {
+  display: block;
 }
 
 .original-subtitle-cover {
@@ -1039,6 +1121,25 @@ body.dragging-cover * {
   user-select: none;
 }
 
+body.resizing-subtitle-text,
+body.resizing-subtitle-text * {
+  user-select: none;
+}
+
+body.resizing-subtitle-text[data-subtitle-resize-corner="nw"],
+body.resizing-subtitle-text[data-subtitle-resize-corner="nw"] * ,
+body.resizing-subtitle-text[data-subtitle-resize-corner="se"],
+body.resizing-subtitle-text[data-subtitle-resize-corner="se"] * {
+  cursor: nwse-resize !important;
+}
+
+body.resizing-subtitle-text[data-subtitle-resize-corner="ne"],
+body.resizing-subtitle-text[data-subtitle-resize-corner="ne"] * ,
+body.resizing-subtitle-text[data-subtitle-resize-corner="sw"],
+body.resizing-subtitle-text[data-subtitle-resize-corner="sw"] * {
+  cursor: nesw-resize !important;
+}
+
 .transport-bar {
   position: relative;
   z-index: 8;
@@ -1048,9 +1149,9 @@ body.dragging-cover * {
     ". playback preview"
     "artifacts artifacts artifacts";
   align-items: center;
-  gap: 8px 12px;
-  min-height: 48px;
-  padding: 8px 18px;
+  gap: 6px 10px;
+  min-height: 42px;
+  padding: 6px 14px;
   background: var(--panel);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -1105,12 +1206,12 @@ body.dragging-cover * {
 .toolbar-group {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex: 0 0 auto;
-  min-height: 36px;
-  padding: 4px;
+  min-height: 31px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--panel-soft);
 }
 
@@ -1135,8 +1236,8 @@ body.dragging-cover * {
 .video-playback-controls {
   grid-area: playback;
   justify-self: center;
-  gap: 6px;
-  padding-inline: 6px;
+  gap: 4px;
+  padding-inline: 5px;
   border-color: var(--line);
   background: var(--panel-soft);
 }
@@ -1145,20 +1246,20 @@ body.dragging-cover * {
 .video-play-button {
   display: inline-grid;
   place-items: center;
-  min-width: 34px;
-  height: 28px;
+  min-width: 30px;
+  height: 25px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 900;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .video-play-button {
-  min-width: 42px;
+  min-width: 38px;
   background: var(--text);
   color: var(--panel);
 }
@@ -1182,13 +1283,13 @@ body.dragging-cover * {
 
 .edit-action-group .secondary-action,
 .compact-import {
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 25px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   transition: all 0.2s ease;
 }
@@ -1205,12 +1306,12 @@ body.dragging-cover * {
 }
 
 .toolbar-count {
-  min-height: 24px;
-  padding: 4px 8px;
+  min-height: 21px;
+  padding: 3px 7px;
   border-radius: 999px;
   background: #e8f7ee;
   color: #15803d;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -1278,13 +1379,13 @@ body.dragging-cover * {
 
 .preview-switches .ghost-button {
   flex: 0 0 auto;
-  min-height: 30px;
-  padding: 0 14px;
+  min-height: 26px;
+  padding: 0 12px;
   border: 1px solid rgba(125, 211, 252, 0.24);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(148, 163, 184, 0.14);
   color: #e0f2fe;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 900;
   text-shadow: 0 1px 8px rgba(56, 189, 248, 0.32);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -1307,30 +1408,30 @@ body.dragging-cover * {
 
 .timeline-shell {
   display: grid;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: 36px 1fr;
   min-height: 0;
   background: var(--panel);
-  padding-left: 10px;
-  padding-right: 10px;
-  padding-bottom: 12px;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-bottom: 8px;
 }
 
 .timeline-actions {
-  padding: 6px 14px;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--line);
   overflow: auto hidden;
 }
 
 .timeline-actions .secondary-action {
-  min-height: 30px;
-  padding: 0 12px;
+  min-height: 26px;
+  padding: 0 10px;
   border-color: #e3e9f2;
   background: #fff;
 }
 
 .timeline-zoom-control {
   flex: 0 0 auto;
-  padding: 3px 9px;
+  padding: 2px 8px;
 }
 
 .timeline-actions .muted {
@@ -1348,17 +1449,17 @@ body.dragging-cover * {
 .timeline-track {
   position: relative;
   min-width: 0;
-  margin-top: 8px;
-  margin-bottom: 4px;
+  margin-top: 6px;
+  margin-bottom: 2px;
   overflow: auto hidden;
   background: var(--panel-dark);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .timeline-ruler {
   position: relative;
-  height: 28px;
+  height: 22px;
   min-width: 100%;
   border-bottom: 1px solid var(--line);
   background: var(--panel-dark);
@@ -1367,7 +1468,7 @@ body.dragging-cover * {
 .timeline-waveform {
   display: block;
   width: 100%;
-  height: 92px;
+  height: clamp(46px, 7vh, 68px);
   background-color: var(--panel-dark);
   background-image:
     linear-gradient(rgba(6, 182, 212, 0.08) 1px, transparent 1px),
@@ -1388,10 +1489,10 @@ body.dragging-cover * {
 
 .timeline-marker span {
   position: absolute;
-  top: 6px;
+  top: 4px;
   left: 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -1399,19 +1500,19 @@ body.dragging-cover * {
 .timeline-lane {
   position: relative;
   min-width: 100%;
-  height: 124px;
+  height: clamp(68px, 9vh, 92px);
   background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 
 .timeline-block {
   position: absolute;
-  top: 16px;
-  height: 70px;
-  min-width: 52px;
-  padding: 8px;
+  top: 9px;
+  height: clamp(46px, 6.4vh, 58px);
+  min-width: 48px;
+  padding: 6px;
   border: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: 9px;
   background: linear-gradient(135deg, #1f2937, #374151);
   color: #fff;
   overflow: hidden;
@@ -1450,16 +1551,16 @@ body.dragging * {
 }
 
 .timeline-stamp {
-  margin-bottom: 4px;
-  font-size: 11px;
+  margin-bottom: 3px;
+  font-size: 10px;
   opacity: 0.82;
 }
 
 .timeline-handle {
   position: absolute;
-  top: 10px;
-  bottom: 10px;
-  width: 6px;
+  top: 8px;
+  bottom: 8px;
+  width: 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.75);
   cursor: ew-resize;
@@ -1932,14 +2033,14 @@ body.dragging * {
 
   .editor-main {
     min-height: 100vh;
-    grid-template-rows: auto minmax(260px, auto) auto 292px;
+    grid-template-rows: auto minmax(260px, auto) auto clamp(170px, 28vh, 220px);
   }
 
   .topbar,
   .transport-bar {
     grid-template-columns: 1fr;
     height: auto;
-    padding: 12px;
+    padding: 10px;
   }
 
   .transport-bar {
@@ -1960,7 +2061,7 @@ body.dragging * {
   .toolbar-group {
     flex: 1 1 min(100%, 220px);
     justify-content: center;
-    min-height: 34px;
+    min-height: 31px;
   }
 
   .file-format-group,
@@ -1995,7 +2096,7 @@ body.dragging * {
   }
 
   .canvas-area {
-    padding: 16px;
+    padding: 10px;
   }
 
   .canvas-controls {
@@ -2005,9 +2106,9 @@ body.dragging * {
 
   .canvas-controls-body {
     grid-template-columns: 1fr;
-    width: min(360px, calc(100vw - 24px));
+    width: min(300px, calc(100vw - 24px));
     justify-content: flex-start;
-    max-height: min(62vh, 520px);
+    max-height: min(42vh, 320px);
   }
 
   .canvas-frame {
@@ -2044,5 +2145,50 @@ body.dragging * {
   .compact-import,
   .edit-action-group .secondary-action {
     width: 100%;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 901px) {
+  .capcut-shell {
+    padding: 10px;
+    gap: 10px;
+    height: 100vh;
+  }
+
+  .editor-main,
+  .media-panel,
+  .inspector-panel {
+    height: calc(100vh - 20px);
+  }
+
+  .editor-main {
+    grid-template-rows: auto minmax(300px, 1fr) auto clamp(150px, 21vh, 190px);
+  }
+
+  .topbar {
+    padding-block: 6px;
+  }
+
+  .transport-bar {
+    padding-block: 5px;
+  }
+
+  .timeline-shell {
+    grid-template-rows: 32px 1fr;
+    padding-bottom: 6px;
+  }
+
+  .timeline-waveform {
+    height: clamp(38px, 6vh, 54px);
+  }
+
+  .timeline-lane {
+    height: clamp(58px, 8vh, 76px);
+  }
+
+  .timeline-block {
+    top: 7px;
+    height: clamp(40px, 5.7vh, 50px);
+    font-size: 11px;
   }
 }

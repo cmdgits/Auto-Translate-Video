@@ -638,6 +638,9 @@ class VideoTranslationPipeline:
         if not context.srt_path.exists():
             raise ProcessError("Chua co file SRT de burn subtitle.")
         subtitle_render_config = self._render_config_for_options(options)
+        manifest = self.jobs.load_manifest(context.job_id)
+        video_width = manifest.metadata.width if manifest and manifest.metadata else None
+        video_height = manifest.metadata.height if manifest and manifest.metadata else None
         transcript = self._read_transcript(context)
         subtitle_path = write_ass(
             transcript,
@@ -648,6 +651,8 @@ class VideoTranslationPipeline:
             bottom_percent=subtitle_render_config.subtitle_position_y,
             auto_wrap_chars_per_line=self.config.subtitles.max_chars_per_line,
             auto_wrap_max_lines=self.config.subtitles.max_lines,
+            play_res_x=video_width or 1280,
+            play_res_y=video_height or 720,
         )
         duration_sec = self._duration_for_context(context)
         return self._run_video_render_with_auto_encoder(
@@ -768,7 +773,7 @@ class VideoTranslationPipeline:
         if options.subtitle_cover_position_y is not None:
             updates["subtitle_cover_position_y"] = max(0.0, min(100.0, float(options.subtitle_cover_position_y)))
         if options.subtitle_font_size is not None:
-            updates["subtitle_font_size"] = max(8.0, min(64.0, float(options.subtitle_font_size)))
+            updates["subtitle_font_size"] = max(8.0, min(120.0, float(options.subtitle_font_size)))
         if options.subtitle_box_width_ratio is not None:
             updates["subtitle_box_width_ratio"] = max(0.1, min(1.0, float(options.subtitle_box_width_ratio)))
         if options.subtitle_position_x is not None:

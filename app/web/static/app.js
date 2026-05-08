@@ -43,6 +43,8 @@ const subtitleCoverHeightValue = document.getElementById("subtitleCoverHeightVal
 const subtitleCoverWidthRange = document.getElementById("subtitleCoverWidthRange");
 const subtitleCoverWidthValue = document.getElementById("subtitleCoverWidthValue");
 const subtitleOverlay = document.getElementById("subtitleOverlay");
+const subtitleOverlayText = document.getElementById("subtitleOverlayText");
+const subtitleResizeHandles = document.querySelectorAll("[data-subtitle-resize-corner]");
 const originalSubtitleCover = document.getElementById("originalSubtitleCover");
 const emptyState = document.getElementById("emptyState");
 const videoName = document.getElementById("videoName");
@@ -122,9 +124,9 @@ const AUTO_PREVIEW_SEGMENT_PADDING = 0.08;
 const MIN_VIDEO_ZOOM = 60;
 const MAX_VIDEO_ZOOM = 180;
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9;
-const SUBTITLE_PREVIEW_REFERENCE_WIDTH = 1090;
+const SUBTITLE_PREVIEW_REFERENCE_HEIGHT = 720;
 const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
-const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 128;
+const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 256;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
@@ -300,6 +302,8 @@ const state = {
   waveformLoading: false,
   canvasResize: null,
   subtitleDrag: null,
+  subtitleResize: null,
+  subtitleStyleSource: "",
   coverDrag: null,
   liveSegmentId: null,
   segmentPreviewStopHandler: null,
@@ -753,16 +757,70 @@ function preferredPreviewSourceMode(mode) {
 }
 
 function persistSubtitleStyle() {
+  state.subtitleStyleSource = "manual";
   try {
     window.localStorage.setItem(SUBTITLE_STYLE_STORAGE_KEY, JSON.stringify(state.subtitleStyle));
   } catch (error) {
   }
 }
 
+function persistSubtitleStyleFromJob() {
+  try {
+    window.localStorage.setItem(SUBTITLE_STYLE_STORAGE_KEY, JSON.stringify(state.subtitleStyle));
+  } catch (error) {
+  }
+}
+
+function subtitlePreviewRect() {
+  const frameRect = canvasFrame?.getBoundingClientRect();
+  if (!frameRect?.width || !frameRect?.height) {
+    return {
+      left: 0,
+      top: 0,
+      right: SUBTITLE_PREVIEW_REFERENCE_HEIGHT * DEFAULT_VIDEO_ASPECT_RATIO,
+      bottom: SUBTITLE_PREVIEW_REFERENCE_HEIGHT,
+      width: SUBTITLE_PREVIEW_REFERENCE_HEIGHT * DEFAULT_VIDEO_ASPECT_RATIO,
+      height: SUBTITLE_PREVIEW_REFERENCE_HEIGHT,
+      frameWidth: SUBTITLE_PREVIEW_REFERENCE_HEIGHT * DEFAULT_VIDEO_ASPECT_RATIO,
+      frameHeight: SUBTITLE_PREVIEW_REFERENCE_HEIGHT,
+    };
+  }
+
+  const elementRect = videoPreview?.getBoundingClientRect();
+  const sourceRect = elementRect?.width && elementRect?.height ? elementRect : frameRect;
+  let left = sourceRect.left - frameRect.left;
+  let top = sourceRect.top - frameRect.top;
+  let width = sourceRect.width;
+  let height = sourceRect.height;
+  const aspectRatio = currentVideoAspectRatio();
+  const sourceAspectRatio = width / Math.max(height, 1);
+
+  if (aspectRatio > 0 && sourceAspectRatio > aspectRatio) {
+    const visibleWidth = height * aspectRatio;
+    left += (width - visibleWidth) / 2;
+    width = visibleWidth;
+  } else if (aspectRatio > 0 && sourceAspectRatio < aspectRatio) {
+    const visibleHeight = width / aspectRatio;
+    top += (height - visibleHeight) / 2;
+    height = visibleHeight;
+  }
+
+  return {
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    frameWidth: frameRect.width,
+    frameHeight: frameRect.height,
+  };
+}
+
 function subtitlePreviewScale() {
-  const rect = canvasFrame?.getBoundingClientRect();
-  const width = rect?.width || parseFloat(canvasFrame?.style.width) || SUBTITLE_PREVIEW_REFERENCE_WIDTH;
-  return Math.max(0.25, Math.min(2.5, width / SUBTITLE_PREVIEW_REFERENCE_WIDTH));
+  const rect = subtitlePreviewRect();
+  const height = rect.height || parseFloat(canvasFrame?.style.height) || SUBTITLE_PREVIEW_REFERENCE_HEIGHT;
+  return Math.max(0.25, Math.min(3, height / SUBTITLE_PREVIEW_REFERENCE_HEIGHT));
 }
 
 function applySubtitleOverlayScale() {
@@ -773,14 +831,72 @@ function applySubtitleOverlayScale() {
     MAX_PREVIEW_SUBTITLE_FONT_SIZE,
     state.subtitleStyle.size,
   );
-  const paddingY = Math.max(3, Math.round(10 * scale));
-  const paddingX = Math.max(5, Math.round(16 * scale));
   const shadowY = Math.max(1, 3 * scale).toFixed(1);
   const shadowBlur = Math.max(2, 8 * scale).toFixed(1);
   const strokeBlur = Math.max(1, 2 * scale).toFixed(1);
   subtitleOverlay.style.fontSize = `${fontSize.toFixed(1)}px`;
-  subtitleOverlay.style.padding = `${paddingY}px ${paddingX}px`;
+  subtitleOverlay.style.padding = "0";
   subtitleOverlay.style.textShadow = `0 ${shadowY}px ${shadowBlur}px #000, 0 0 ${strokeBlur}px #000`;
+}
+
+function setSubtitleOverlayText(text = "") {
+  if (subtitleOverlayText) {
+    subtitleOverlayText.textContent = text;
+    return;
+  }
+  subtitleOverlay.textContent = text;
+}
+
+function subtitleStyleFromJobOptions(options = {}) {
+  const nextStyle = {};
+  if (Number.isFinite(Number(options.subtitle_font_size))) {
+    nextStyle.size = Number(options.subtitle_font_size);
+  }
+  if (Number.isFinite(Number(options.subtitle_box_width_ratio))) {
+    nextStyle.boxWidth = Number(options.subtitle_box_width_ratio) * 100;
+  }
+  if (Number.isFinite(Number(options.subtitle_position_x))) {
+    nextStyle.x = Number(options.subtitle_position_x);
+  }
+  if (Number.isFinite(Number(options.subtitle_position_y))) {
+    nextStyle.y = Number(options.subtitle_position_y);
+  }
+  if (["none", "box"].includes(options.subtitle_cover_mode)) {
+    nextStyle.coverMode = options.subtitle_cover_mode;
+  }
+  if (Number.isFinite(Number(options.subtitle_cover_opacity))) {
+    nextStyle.coverOpacity = Number(options.subtitle_cover_opacity) * 100;
+  }
+  if (Number.isFinite(Number(options.subtitle_cover_height_ratio))) {
+    nextStyle.coverHeight = Number(options.subtitle_cover_height_ratio) * 100;
+  }
+  if (Number.isFinite(Number(options.subtitle_cover_width_ratio))) {
+    nextStyle.coverWidth = Number(options.subtitle_cover_width_ratio) * 100;
+  }
+  if (Number.isFinite(Number(options.subtitle_cover_position_x))) {
+    nextStyle.coverX = Number(options.subtitle_cover_position_x);
+  }
+  if (Number.isFinite(Number(options.subtitle_cover_position_y))) {
+    nextStyle.coverY = Number(options.subtitle_cover_position_y);
+  }
+  return Object.keys(nextStyle).length ? nextStyle : null;
+}
+
+function syncSubtitleStyleFromJob(job, force = false) {
+  const nextStyle = subtitleStyleFromJobOptions(job?.options || {});
+  if (!nextStyle) {
+    return;
+  }
+  const source = `${job.job_id}:${JSON.stringify(nextStyle)}`;
+  if (state.subtitleStyleSource === source) {
+    return;
+  }
+  if (!force && state.subtitleStyleSource === "manual") {
+    return;
+  }
+  state.subtitleStyleSource = source;
+  applySubtitleStyle(nextStyle);
+  persistSubtitleStyleFromJob();
 }
 
 function applySubtitleStyle(nextStyle = {}) {
@@ -791,7 +907,7 @@ function applySubtitleStyle(nextStyle = {}) {
     coverMode = "box";
   }
   state.subtitleStyle = {
-    size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 64, 32),
+    size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 120, 32),
     boxWidth: clampNumber(nextStyle.boxWidth ?? state.subtitleStyle.boxWidth, 10, 100, 84),
     x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 0, 100, 50),
     y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 0, 100, 8),
@@ -803,23 +919,29 @@ function applySubtitleStyle(nextStyle = {}) {
     coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 1, 100, 86),
   };
   applySubtitleOverlayScale();
-  subtitleOverlay.style.left = `${state.subtitleStyle.x}%`;
+  const previewRect = subtitlePreviewRect();
+  const subtitleLeft = previewRect.left + previewRect.width * (state.subtitleStyle.x / 100);
+  const subtitleBottom = previewRect.frameHeight - previewRect.bottom + previewRect.height * (state.subtitleStyle.y / 100);
+  const subtitleWidth = previewRect.width * (state.subtitleStyle.boxWidth / 100);
+  subtitleOverlay.style.left = `${subtitleLeft}px`;
   subtitleOverlay.style.right = "auto";
-  subtitleOverlay.style.bottom = `${state.subtitleStyle.y}%`;
-  subtitleOverlay.style.transform = "translateX(-50%)";
-  subtitleOverlay.style.width = "max-content";
-  subtitleOverlay.style.maxWidth = `${state.subtitleStyle.boxWidth}%`;
+  subtitleOverlay.style.bottom = `${subtitleBottom}px`;
+  subtitleOverlay.style.transform = "translate(-50%, 0)";
+  subtitleOverlay.style.width = `${subtitleWidth}px`;
+  subtitleOverlay.style.maxWidth = `${previewRect.width}px`;
   const compactCoverWidth = state.subtitleStyle.coverWidth;
-  const coverLeft = (100 - compactCoverWidth) * (state.subtitleStyle.coverX / 100);
-  const coverBottom = (100 - state.subtitleStyle.coverHeight) * (state.subtitleStyle.coverY / 100);
-  originalSubtitleCover.style.height = `${state.subtitleStyle.coverHeight}%`;
-  originalSubtitleCover.style.bottom = `${coverBottom}%`;
+  const coverWidth = previewRect.width * (compactCoverWidth / 100);
+  const coverHeight = previewRect.height * (state.subtitleStyle.coverHeight / 100);
+  const coverLeft = previewRect.left + (previewRect.width - coverWidth) * (state.subtitleStyle.coverX / 100);
+  const coverBottom = previewRect.frameHeight - previewRect.bottom + (previewRect.height - coverHeight) * (state.subtitleStyle.coverY / 100);
+  originalSubtitleCover.style.height = `${coverHeight}px`;
+  originalSubtitleCover.style.bottom = `${coverBottom}px`;
   originalSubtitleCover.style.opacity = state.subtitleStyle.coverMode === "box"
     ? "1"
     : "0";
-  originalSubtitleCover.style.left = `${coverLeft}%`;
+  originalSubtitleCover.style.left = `${coverLeft}px`;
   originalSubtitleCover.style.right = "auto";
-  originalSubtitleCover.style.width = `${compactCoverWidth}%`;
+  originalSubtitleCover.style.width = `${coverWidth}px`;
   originalSubtitleCover.style.transform = "none";
   originalSubtitleCover.style.backdropFilter = state.subtitleStyle.coverMode === "box"
     ? `blur(${Math.max(4, Math.round(state.subtitleStyle.coverOpacity / 8))}px)`
@@ -1657,8 +1779,16 @@ function applyVideoZoom(value = state.videoZoom) {
   const zoomScale = nextZoom / 100;
   const fitWidth = Math.min(availableWidth, availableHeight * aspectRatio);
   const fitHeight = Math.min(availableHeight, fitWidth / aspectRatio);
-  const targetWidth = Math.min(availableWidth, fitWidth * zoomScale);
-  const targetHeight = Math.min(availableHeight, targetWidth / aspectRatio);
+  let targetWidth = fitWidth * zoomScale;
+  let targetHeight = fitHeight * zoomScale;
+  if (targetWidth > availableWidth) {
+    targetWidth = availableWidth;
+    targetHeight = targetWidth / aspectRatio;
+  }
+  if (targetHeight > availableHeight) {
+    targetHeight = availableHeight;
+    targetWidth = targetHeight * aspectRatio;
+  }
   state.videoZoom = nextZoom;
   canvasFrame.style.width = `${Math.round(targetWidth)}px`;
   canvasFrame.style.height = `${Math.round(targetHeight)}px`;
@@ -1669,7 +1799,7 @@ function applyVideoZoom(value = state.videoZoom) {
   if (videoZoomValue) {
     videoZoomValue.textContent = `${nextZoom}%`;
   }
-  applySubtitleOverlayScale();
+  applySubtitleStyle();
 }
 
 function resetVideoZoom() {
@@ -1682,7 +1812,7 @@ function setCanvasControlsOpen(open) {
   }
   canvasControls.classList.toggle("collapsed", !open);
   canvasControlsToggle.setAttribute("aria-expanded", String(open));
-  canvasControlsToggle.textContent = open ? "✕ Đóng chỉnh" : "⚙ Chỉnh";
+  canvasControlsToggle.textContent = open ? "✕ Đóng" : "⚙ Chỉnh";
   applyVideoZoom();
 }
 
@@ -1806,7 +1936,7 @@ function drawWaveform() {
     return;
   }
   const width = Math.max(1, Math.round(state.laneWidth || timelineTrack.clientWidth || 1));
-  const height = Math.max(84, Math.round(timelineWaveform.clientHeight || 92));
+  const height = Math.max(42, Math.round(timelineWaveform.clientHeight || 64));
   const pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   const canvasWidth = Math.round(width * pixelRatio);
   const canvasHeight = Math.round(height * pixelRatio);
@@ -2112,7 +2242,7 @@ function selectSegment(segmentId, seekVideo = false, focusEditor = false, autoPl
   const selectedSegment = getSelectedSegment();
   if (selectedSegment) {
     const selectedText = segmentSubtitleText(selectedSegment);
-    subtitleOverlay.textContent = selectedText;
+    setSubtitleOverlayText(selectedText);
     subtitleOverlay.classList.toggle("hidden", !selectedText || !showSubtitleOverlayInCurrentMode());
   }
   if (focusEditor) {
@@ -2129,7 +2259,7 @@ function applyPlaybackHighlight(currentTime) {
   );
   state.liveSegmentId = activeSegment ? Number(activeSegment.id) : null;
   const overlayText = activeSegment ? segmentSubtitleText(activeSegment) : "";
-  subtitleOverlay.textContent = overlayText;
+  setSubtitleOverlayText(overlayText);
   subtitleOverlay.classList.toggle("hidden", !overlayText || !showSubtitleOverlayInCurrentMode());
 
   document.querySelectorAll(".timeline-block").forEach((block) => {
@@ -2165,6 +2295,7 @@ function applyJobState(job) {
     state.waveformJobId = null;
     loadWaveform(job.job_id);
   }
+  syncSubtitleStyleFromJob(job, isJobChanged);
 
   languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"} · ${asrDeviceLabel(job.options)}`;
   const jobPercent = Math.round((job.progress || 0) * 100);
@@ -2278,7 +2409,7 @@ function clearSelectedJob() {
   state.segments = [];
   state.selectedSegmentId = null;
   state.previewMode = "source";
-  subtitleOverlay.textContent = "";
+  setSubtitleOverlayText("");
   subtitleOverlay.classList.add("hidden");
   originalSubtitleCover.classList.add("hidden");
   videoPreview.removeAttribute("src");
@@ -2992,8 +3123,32 @@ canvasResizeHandle.addEventListener("mousedown", (event) => {
   document.body.classList.add("resizing-canvas");
 });
 
+subtitleResizeHandles.forEach((handle) => {
+  handle.addEventListener("mousedown", (event) => {
+    if (!showSubtitleOverlayInCurrentMode()) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    state.subtitleResize = {
+      corner: handle.dataset.subtitleResizeCorner || "se",
+      startX: event.clientX,
+      startY: event.clientY,
+      initialSize: state.subtitleStyle.size,
+      initialBoxWidth: state.subtitleStyle.boxWidth,
+      initialX: state.subtitleStyle.x,
+      initialY: state.subtitleStyle.y,
+    };
+    document.body.dataset.subtitleResizeCorner = state.subtitleResize.corner;
+    document.body.classList.add("resizing-subtitle-text");
+  });
+});
+
 subtitleOverlay.addEventListener("mousedown", (event) => {
   if (!showSubtitleOverlayInCurrentMode()) {
+    return;
+  }
+  if (event.target instanceof Element && event.target.closest(".subtitle-resize-handle")) {
     return;
   }
   event.preventDefault();
@@ -3400,8 +3555,29 @@ document.addEventListener("mousemove", (event) => {
     return;
   }
 
+  if (state.subtitleResize) {
+    const rect = subtitlePreviewRect();
+    const corner = state.subtitleResize.corner || "se";
+    const horizontalDirection = corner.includes("w") ? -1 : 1;
+    const verticalDirection = corner.includes("n") ? -1 : 1;
+    const rawDeltaX = ((event.clientX - state.subtitleResize.startX) / Math.max(rect.width, 1)) * 100;
+    const rawDeltaY = ((event.clientY - state.subtitleResize.startY) / Math.max(rect.height, 1)) * 100;
+    const deltaWidth = rawDeltaX * horizontalDirection;
+    const deltaSize = ((event.clientY - state.subtitleResize.startY) * verticalDirection) / Math.max(subtitlePreviewScale(), 0.25) * 0.5;
+    const nextStyle = {
+      boxWidth: state.subtitleResize.initialBoxWidth + deltaWidth,
+      size: state.subtitleResize.initialSize + deltaSize,
+      x: state.subtitleResize.initialX + rawDeltaX / 2,
+    };
+    if (corner.includes("s")) {
+      nextStyle.y = state.subtitleResize.initialY - rawDeltaY;
+    }
+    applySubtitleStyle(nextStyle);
+    return;
+  }
+
   if (state.subtitleDrag) {
-    const rect = canvasFrame.getBoundingClientRect();
+    const rect = subtitlePreviewRect();
     const deltaX = ((event.clientX - state.subtitleDrag.startX) / Math.max(rect.width, 1)) * 100;
     const deltaY = ((event.clientY - state.subtitleDrag.startY) / Math.max(rect.height, 1)) * 100;
     applySubtitleStyle({
@@ -3412,7 +3588,7 @@ document.addEventListener("mousemove", (event) => {
   }
 
   if (state.coverDrag) {
-    const rect = canvasFrame.getBoundingClientRect();
+    const rect = subtitlePreviewRect();
     const deltaX = ((event.clientX - state.coverDrag.startX) / Math.max(rect.width, 1)) * 100;
     const deltaY = ((event.clientY - state.coverDrag.startY) / Math.max(rect.height, 1)) * 100;
     applySubtitleStyle({
@@ -3467,6 +3643,13 @@ document.addEventListener("mouseup", () => {
   if (state.subtitleDrag) {
     state.subtitleDrag = null;
     document.body.classList.remove("dragging-subtitle");
+    persistSubtitleStyle();
+  }
+
+  if (state.subtitleResize) {
+    state.subtitleResize = null;
+    document.body.classList.remove("resizing-subtitle-text");
+    delete document.body.dataset.subtitleResizeCorner;
     persistSubtitleStyle();
   }
 
@@ -3544,7 +3727,10 @@ videoPreview.addEventListener("timeupdate", () => {
 videoPreview.addEventListener("play", updateVideoPlaybackControls);
 videoPreview.addEventListener("pause", updateVideoPlaybackControls);
 videoPreview.addEventListener("ended", updateVideoPlaybackControls);
-videoPreview.addEventListener("loadedmetadata", updateVideoPlaybackControls);
+videoPreview.addEventListener("loadedmetadata", () => {
+  updateVideoPlaybackControls();
+  applyVideoZoom();
+});
 
 videoPreview.addEventListener("loadeddata", () => {
   emptyState.style.display = "none";
@@ -3558,7 +3744,7 @@ window.addEventListener("resize", () => {
 });
 
 if (typeof ResizeObserver !== "undefined") {
-  const canvasFrameObserver = new ResizeObserver(() => applySubtitleOverlayScale());
+  const canvasFrameObserver = new ResizeObserver(() => applySubtitleStyle());
   canvasFrameObserver.observe(canvasFrame);
 }
 
