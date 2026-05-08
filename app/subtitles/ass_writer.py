@@ -8,6 +8,17 @@ from app.models import TranscriptDocument
 
 PLAY_RES_X = 1280
 PLAY_RES_Y = 720
+DEFAULT_FONT_FAMILY = "Arial"
+SAFE_FONT_FAMILIES = {
+    "arial": "Arial",
+    "tahoma": "Tahoma",
+    "verdana": "Verdana",
+    "segoe ui": "Segoe UI",
+    "times new roman": "Times New Roman",
+    "georgia": "Georgia",
+    "courier new": "Courier New",
+    "impact": "Impact",
+}
 
 
 def format_ass_timestamp(seconds: float) -> str:
@@ -27,6 +38,35 @@ def escape_ass_text(value: str) -> str:
         .replace("\n", r"\N")
         .strip()
     )
+
+
+def safe_ass_font_family(value: str | None) -> str:
+    font_family = str(value or "").strip().lower()
+    return SAFE_FONT_FAMILIES.get(font_family, DEFAULT_FONT_FAMILY)
+
+
+def safe_ass_font_weight(value: str | int | None) -> int:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "normal":
+            return 0
+        if normalized in {"bold", "black"}:
+            return -1
+    try:
+        weight = int(value or 0)
+    except (TypeError, ValueError):
+        weight = 900
+    return -1 if weight >= 700 else 0
+
+
+def hex_to_ass_color(value: str | None) -> str:
+    color = str(value or "").strip().lstrip("#")
+    if len(color) == 3 and all(character in "0123456789abcdefABCDEF" for character in color):
+        color = "".join(character * 2 for character in color)
+    if len(color) != 6 or any(character not in "0123456789abcdefABCDEF" for character in color):
+        color = "FFFFFF"
+    red, green, blue = color[0:2], color[2:4], color[4:6]
+    return f"&H00{blue}{green}{red}".upper()
 
 
 def wrap_ass_text(value: str, font_size: int, box_width_ratio: float, play_res_x: int = PLAY_RES_X) -> str:
@@ -90,6 +130,9 @@ def write_ass(
     document: TranscriptDocument,
     output_path: Path,
     font_size: float = 32,
+    font_family: str = DEFAULT_FONT_FAMILY,
+    font_weight: str | int = "900",
+    primary_color: str = "#FFFFFF",
     box_width_ratio: float = 0.84,
     position_x_percent: float = 50,
     bottom_percent: float = 8,
@@ -102,6 +145,9 @@ def write_ass(
     safe_play_res_y = max(1, int(play_res_y or PLAY_RES_Y))
     base_font_size = max(8, min(120, float(font_size)))
     safe_font_size = max(4, min(256, int(round(base_font_size * safe_play_res_y / PLAY_RES_Y))))
+    safe_font_family = safe_ass_font_family(font_family)
+    safe_bold = safe_ass_font_weight(font_weight)
+    safe_primary_color = hex_to_ass_color(primary_color)
     safe_x = max(0.0, min(100.0, float(position_x_percent)))
     safe_bottom = max(0.0, min(100.0, float(bottom_percent)))
     position_x = round(safe_play_res_x * safe_x / 100)
@@ -118,8 +164,13 @@ def write_ass(
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        "Style: Default,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H64000000,"
-        "-1,0,0,0,100,100,0,0,1,3,1,2,20,20,0,1".format(font_size=safe_font_size),
+        "Style: Default,{font_family},{font_size},{primary_color},&H000000FF,&H00000000,&H64000000,"
+        "{bold},0,0,0,100,100,0,0,1,3,1,2,20,20,0,1".format(
+            font_family=safe_font_family,
+            font_size=safe_font_size,
+            primary_color=safe_primary_color,
+            bold=safe_bold,
+        ),
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",

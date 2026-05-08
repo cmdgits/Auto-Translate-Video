@@ -73,6 +73,9 @@ class PipelineRunOptions(BaseModel):
     render_encoder: Literal["cpu", "nvidia", "intel", "amd"] | None = None
     render_preset: Literal["fast", "balanced", "quality"] | None = None
     subtitle_font_size: float | None = None
+    subtitle_font_family: str | None = None
+    subtitle_font_weight: str | None = None
+    subtitle_primary_color: str | None = None
     subtitle_box_width_ratio: float | None = None
     subtitle_position_x: float | None = None
     subtitle_position_y: float | None = None

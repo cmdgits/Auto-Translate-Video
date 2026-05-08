@@ -25,6 +25,10 @@ const videoPlayPauseBtn = document.getElementById("videoPlayPauseBtn");
 const videoForwardBtn = document.getElementById("videoForwardBtn");
 const subtitleSizeRange = document.getElementById("subtitleSizeRange");
 const subtitleSizeValue = document.getElementById("subtitleSizeValue");
+const subtitleFontSelect = document.getElementById("subtitleFontSelect");
+const subtitleWeightSelect = document.getElementById("subtitleWeightSelect");
+const subtitleColorInput = document.getElementById("subtitleColorInput");
+const subtitleColorValue = document.getElementById("subtitleColorValue");
 const subtitleBoxWidthRange = document.getElementById("subtitleBoxWidthRange");
 const subtitleBoxWidthValue = document.getElementById("subtitleBoxWidthValue");
 const subtitleXRange = document.getElementById("subtitleXRange");
@@ -121,8 +125,8 @@ const MIN_SEGMENT_DURATION = 0.2;
 const DEFAULT_TIMELINE_PIXELS_PER_SECOND = 72;
 const DRAG_SNAP_SECONDS = 0.01;
 const AUTO_PREVIEW_SEGMENT_PADDING = 0.08;
-const MIN_VIDEO_ZOOM = 60;
-const MAX_VIDEO_ZOOM = 180;
+const MIN_VIDEO_ZOOM = 35;
+const MAX_VIDEO_ZOOM = 400;
 const DEFAULT_VIDEO_ASPECT_RATIO = 16 / 9;
 const SUBTITLE_PREVIEW_REFERENCE_HEIGHT = 720;
 const MIN_PREVIEW_SUBTITLE_FONT_SIZE = 4;
@@ -130,6 +134,30 @@ const MAX_PREVIEW_SUBTITLE_FONT_SIZE = 256;
 const API_SETTINGS_STORAGE_KEY = "autoTranslateVideo.apiSettings.v1";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 const SUBTITLE_STYLE_STORAGE_KEY = "autoTranslateVideo.subtitleStyle.v1";
+const DEFAULT_SUBTITLE_FONT_FAMILY = "Arial";
+const DEFAULT_SUBTITLE_FONT_WEIGHT = "900";
+const DEFAULT_SUBTITLE_COLOR = "#FFFFFF";
+const SUBTITLE_FONT_FAMILIES = [
+  "Arial",
+  "Tahoma",
+  "Verdana",
+  "Segoe UI",
+  "Times New Roman",
+  "Georgia",
+  "Courier New",
+  "Impact",
+];
+const SUBTITLE_FONT_STACKS = {
+  Arial: "Arial, Helvetica, sans-serif",
+  Tahoma: "Tahoma, Geneva, sans-serif",
+  Verdana: "Verdana, Geneva, sans-serif",
+  "Segoe UI": "'Segoe UI', Arial, Helvetica, sans-serif",
+  "Times New Roman": "'Times New Roman', Times, serif",
+  Georgia: "Georgia, 'Times New Roman', serif",
+  "Courier New": "'Courier New', Courier, monospace",
+  Impact: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif",
+};
+const SUBTITLE_FONT_WEIGHTS = new Set(["400", "700", "900"]);
 const SUBTITLE_DRAFT_STORAGE_PREFIX = "autoTranslateVideo.subtitleDraft.v1";
 const MEDIA_PANEL_COLLAPSED_STORAGE_KEY = "autoTranslateVideo.mediaPanelCollapsed.v1";
 const EXTRA_SUBTITLE_TRACKS_STORAGE_PREFIX = "autoTranslateVideo.extraSubtitleTracks.v1";
@@ -282,8 +310,13 @@ const state = {
   laneWidth: 1400,
   timelinePixelsPerSecond: DEFAULT_TIMELINE_PIXELS_PER_SECOND,
   videoZoom: 100,
+  videoPanX: 0,
+  videoPanY: 0,
   subtitleStyle: {
     size: 32,
+    fontFamily: DEFAULT_SUBTITLE_FONT_FAMILY,
+    fontWeight: DEFAULT_SUBTITLE_FONT_WEIGHT,
+    color: DEFAULT_SUBTITLE_COLOR,
     boxWidth: 84,
     x: 50,
     y: 8,
@@ -301,6 +334,7 @@ const state = {
   waveformJobId: null,
   waveformLoading: false,
   canvasResize: null,
+  canvasPan: null,
   subtitleDrag: null,
   subtitleResize: null,
   subtitleStyleSource: "",
@@ -634,6 +668,37 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, parsed));
 }
 
+function normalizeSubtitleFontFamily(value) {
+  const requested = String(value || "").trim();
+  const matched = SUBTITLE_FONT_FAMILIES.find((fontFamily) => fontFamily.toLowerCase() === requested.toLowerCase());
+  return matched || DEFAULT_SUBTITLE_FONT_FAMILY;
+}
+
+function normalizeSubtitleFontWeight(value) {
+  const weight = String(value || "").trim().toLowerCase();
+  if (weight === "normal") {
+    return "400";
+  }
+  if (weight === "bold") {
+    return "700";
+  }
+  return SUBTITLE_FONT_WEIGHTS.has(weight) ? weight : DEFAULT_SUBTITLE_FONT_WEIGHT;
+}
+
+function normalizeSubtitleColor(value) {
+  const color = String(value || "").trim();
+  const shortHex = color.match(/^#?([0-9a-f]{3})$/i);
+  if (shortHex) {
+    return `#${shortHex[1].split("").map((digit) => digit + digit).join("")}`.toUpperCase();
+  }
+  const longHex = color.match(/^#?([0-9a-f]{6})$/i);
+  return longHex ? `#${longHex[1]}`.toUpperCase() : DEFAULT_SUBTITLE_COLOR;
+}
+
+function subtitleFontStack(fontFamily) {
+  return SUBTITLE_FONT_STACKS[normalizeSubtitleFontFamily(fontFamily)] || SUBTITLE_FONT_STACKS[DEFAULT_SUBTITLE_FONT_FAMILY];
+}
+
 function snapTimelineTime(value) {
   const duration = Number(state.job?.duration_sec || 0);
   let snapped = Number(value) || 0;
@@ -852,6 +917,15 @@ function subtitleStyleFromJobOptions(options = {}) {
   if (Number.isFinite(Number(options.subtitle_font_size))) {
     nextStyle.size = Number(options.subtitle_font_size);
   }
+  if (options.subtitle_font_family) {
+    nextStyle.fontFamily = options.subtitle_font_family;
+  }
+  if (options.subtitle_font_weight) {
+    nextStyle.fontWeight = options.subtitle_font_weight;
+  }
+  if (options.subtitle_primary_color || options.subtitle_color) {
+    nextStyle.color = options.subtitle_primary_color || options.subtitle_color;
+  }
   if (Number.isFinite(Number(options.subtitle_box_width_ratio))) {
     nextStyle.boxWidth = Number(options.subtitle_box_width_ratio) * 100;
   }
@@ -908,6 +982,9 @@ function applySubtitleStyle(nextStyle = {}) {
   }
   state.subtitleStyle = {
     size: clampNumber(nextStyle.size ?? state.subtitleStyle.size, 8, 120, 32),
+    fontFamily: normalizeSubtitleFontFamily(nextStyle.fontFamily ?? state.subtitleStyle.fontFamily),
+    fontWeight: normalizeSubtitleFontWeight(nextStyle.fontWeight ?? state.subtitleStyle.fontWeight),
+    color: normalizeSubtitleColor(nextStyle.color ?? state.subtitleStyle.color),
     boxWidth: clampNumber(nextStyle.boxWidth ?? state.subtitleStyle.boxWidth, 10, 100, 84),
     x: clampNumber(nextStyle.x ?? state.subtitleStyle.x, 0, 100, 50),
     y: clampNumber(nextStyle.y ?? state.subtitleStyle.y, 0, 100, 8),
@@ -919,6 +996,9 @@ function applySubtitleStyle(nextStyle = {}) {
     coverWidth: clampNumber(nextStyle.coverWidth ?? state.subtitleStyle.coverWidth, 1, 100, 86),
   };
   applySubtitleOverlayScale();
+  subtitleOverlay.style.fontFamily = subtitleFontStack(state.subtitleStyle.fontFamily);
+  subtitleOverlay.style.fontWeight = state.subtitleStyle.fontWeight;
+  subtitleOverlay.style.color = state.subtitleStyle.color;
   const previewRect = subtitlePreviewRect();
   const subtitleLeft = previewRect.left + previewRect.width * (state.subtitleStyle.x / 100);
   const subtitleBottom = previewRect.frameHeight - previewRect.bottom + previewRect.height * (state.subtitleStyle.y / 100);
@@ -952,6 +1032,9 @@ function applySubtitleStyle(nextStyle = {}) {
   document.body.classList.toggle("cover-mode-box", state.subtitleStyle.coverMode === "box");
 
   subtitleSizeRange.value = String(state.subtitleStyle.size);
+  subtitleFontSelect.value = state.subtitleStyle.fontFamily;
+  subtitleWeightSelect.value = state.subtitleStyle.fontWeight;
+  subtitleColorInput.value = state.subtitleStyle.color.toLowerCase();
   subtitleBoxWidthRange.value = String(state.subtitleStyle.boxWidth);
   subtitleXRange.value = String(state.subtitleStyle.x);
   subtitleYRange.value = String(state.subtitleStyle.y);
@@ -962,6 +1045,7 @@ function applySubtitleStyle(nextStyle = {}) {
   subtitleCoverHeightRange.value = String(state.subtitleStyle.coverHeight);
   subtitleCoverWidthRange.value = String(state.subtitleStyle.coverWidth);
   subtitleSizeValue.textContent = `${Math.round(state.subtitleStyle.size)}px`;
+  subtitleColorValue.textContent = state.subtitleStyle.color;
   subtitleBoxWidthValue.textContent = `${Math.round(state.subtitleStyle.boxWidth)}%`;
   subtitleXValue.textContent = `${Math.round(state.subtitleStyle.x)}%`;
   subtitleYValue.textContent = `${Math.round(state.subtitleStyle.y)}%`;
@@ -984,6 +1068,9 @@ function loadSubtitleStyle() {
 function subtitleStylePayload() {
   return {
     subtitle_font_size: state.subtitleStyle.size,
+    subtitle_font_family: state.subtitleStyle.fontFamily,
+    subtitle_font_weight: state.subtitleStyle.fontWeight,
+    subtitle_primary_color: state.subtitleStyle.color,
     subtitle_box_width_ratio: state.subtitleStyle.boxWidth / 100,
     subtitle_position_x: state.subtitleStyle.x,
     subtitle_position_y: state.subtitleStyle.y,
@@ -1772,6 +1859,14 @@ function availableCanvasSize() {
   };
 }
 
+function constrainVideoPan(width = canvasFrame.offsetWidth, height = canvasFrame.offsetHeight) {
+  const { width: availableWidth, height: availableHeight } = availableCanvasSize();
+  const maxPanX = Math.max(0, (Number(width) - availableWidth) / 2);
+  const maxPanY = Math.max(0, (Number(height) - availableHeight) / 2);
+  state.videoPanX = clampNumber(state.videoPanX, -maxPanX, maxPanX, 0);
+  state.videoPanY = clampNumber(state.videoPanY, -maxPanY, maxPanY, 0);
+}
+
 function applyVideoZoom(value = state.videoZoom) {
   const nextZoom = Math.max(MIN_VIDEO_ZOOM, Math.min(MAX_VIDEO_ZOOM, Number(value) || 100));
   const { width: availableWidth, height: availableHeight } = availableCanvasSize();
@@ -1779,20 +1874,19 @@ function applyVideoZoom(value = state.videoZoom) {
   const zoomScale = nextZoom / 100;
   const fitWidth = Math.min(availableWidth, availableHeight * aspectRatio);
   const fitHeight = Math.min(availableHeight, fitWidth / aspectRatio);
-  let targetWidth = fitWidth * zoomScale;
-  let targetHeight = fitHeight * zoomScale;
-  if (targetWidth > availableWidth) {
-    targetWidth = availableWidth;
-    targetHeight = targetWidth / aspectRatio;
-  }
-  if (targetHeight > availableHeight) {
-    targetHeight = availableHeight;
-    targetWidth = targetHeight * aspectRatio;
+  const targetWidth = fitWidth * zoomScale;
+  const targetHeight = fitHeight * zoomScale;
+  if (nextZoom <= 100) {
+    state.videoPanX = 0;
+    state.videoPanY = 0;
   }
   state.videoZoom = nextZoom;
+  constrainVideoPan(targetWidth, targetHeight);
   canvasFrame.style.width = `${Math.round(targetWidth)}px`;
   canvasFrame.style.height = `${Math.round(targetHeight)}px`;
   canvasFrame.style.aspectRatio = `${aspectRatio}`;
+  canvasFrame.style.transform = `translate(${state.videoPanX.toFixed(1)}px, ${state.videoPanY.toFixed(1)}px)`;
+  canvasFrame.classList.toggle("zoomed", nextZoom > 100);
   if (videoZoomRange) {
     videoZoomRange.value = String(nextZoom);
   }
@@ -1803,7 +1897,23 @@ function applyVideoZoom(value = state.videoZoom) {
 }
 
 function resetVideoZoom() {
+  state.videoPanX = 0;
+  state.videoPanY = 0;
   applyVideoZoom(100);
+}
+
+function zoomVideoAtPointer(nextZoom, clientX, clientY) {
+  const previousZoom = state.videoZoom || 100;
+  if (!Number.isFinite(Number(nextZoom)) || Number(nextZoom) === previousZoom) {
+    return;
+  }
+  const rect = canvasFrame.getBoundingClientRect();
+  const focusX = Number.isFinite(clientX) ? clientX - (rect.left + rect.width / 2) : 0;
+  const focusY = Number.isFinite(clientY) ? clientY - (rect.top + rect.height / 2) : 0;
+  const ratio = Math.max(MIN_VIDEO_ZOOM, Math.min(MAX_VIDEO_ZOOM, Number(nextZoom))) / previousZoom;
+  state.videoPanX = state.videoPanX - focusX * (ratio - 1);
+  state.videoPanY = state.videoPanY - focusY * (ratio - 1);
+  applyVideoZoom(nextZoom);
 }
 
 function setCanvasControlsOpen(open) {
@@ -3023,9 +3133,34 @@ videoZoomRange.addEventListener("input", () => {
   applyVideoZoom(videoZoomRange.value);
 });
 
+canvasFrame.addEventListener("wheel", (event) => {
+  if (!hasPreviewVideo() || (!event.ctrlKey && !event.altKey)) {
+    return;
+  }
+  event.preventDefault();
+  const delta = event.deltaY > 0 ? -12 : 12;
+  zoomVideoAtPointer(state.videoZoom + delta, event.clientX, event.clientY);
+}, { passive: false });
+
+canvasFrame.addEventListener("mousedown", (event) => {
+  if (!hasPreviewVideo() || state.videoZoom <= 100 || event.button !== 0) {
+    return;
+  }
+  if (event.target instanceof Element && event.target.closest(".subtitle-overlay, .original-subtitle-cover, .canvas-resize-handle, .subtitle-resize-handle")) {
+    return;
+  }
+  event.preventDefault();
+  state.canvasPan = {
+    startX: event.clientX,
+    startY: event.clientY,
+    initialX: state.videoPanX,
+    initialY: state.videoPanY,
+  };
+  document.body.classList.add("panning-canvas");
+});
+
 videoFitBtn.addEventListener("click", () => {
   resetVideoZoom();
-  setCanvasControlsOpen(false);
 });
 
 if (videoBackBtn) {
@@ -3056,6 +3191,24 @@ if (mediaPanelToggle && appShell) {
 
 subtitleSizeRange.addEventListener("input", () => {
   applySubtitleStyle({ size: subtitleSizeRange.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleFontSelect.addEventListener("change", () => {
+  applySubtitleStyle({ fontFamily: subtitleFontSelect.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleWeightSelect.addEventListener("change", () => {
+  applySubtitleStyle({ fontWeight: subtitleWeightSelect.value });
+  persistSubtitleStyle();
+  setPreviewButtons();
+});
+
+subtitleColorInput.addEventListener("input", () => {
+  applySubtitleStyle({ color: subtitleColorInput.value });
   persistSubtitleStyle();
   setPreviewButtons();
 });
@@ -3551,7 +3704,14 @@ timelineLane.addEventListener("mousedown", (event) => {
 document.addEventListener("mousemove", (event) => {
   if (state.canvasResize) {
     const deltaZoom = ((event.clientX - state.canvasResize.startX) / Math.max(canvasFrame.clientWidth, 1)) * 100;
-    applyVideoZoom(state.canvasResize.startZoom + deltaZoom);
+    zoomVideoAtPointer(state.canvasResize.startZoom + deltaZoom, event.clientX, event.clientY);
+    return;
+  }
+
+  if (state.canvasPan) {
+    state.videoPanX = state.canvasPan.initialX + event.clientX - state.canvasPan.startX;
+    state.videoPanY = state.canvasPan.initialY + event.clientY - state.canvasPan.startY;
+    applyVideoZoom(state.videoZoom);
     return;
   }
 
@@ -3638,6 +3798,11 @@ document.addEventListener("mouseup", () => {
   if (state.canvasResize) {
     state.canvasResize = null;
     document.body.classList.remove("resizing-canvas");
+  }
+
+  if (state.canvasPan) {
+    state.canvasPan = null;
+    document.body.classList.remove("panning-canvas");
   }
 
   if (state.subtitleDrag) {

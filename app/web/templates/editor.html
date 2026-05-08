@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=fix-subtitle-ass-anchor-20260508" />
+    <link rel="stylesheet" href="/static/styles.css?v=fix-subtitle-font-color-20260508" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -122,7 +122,7 @@
                 <div class="canvas-control-heading">Khung hình</div>
                 <label class="zoom-control">
                   <span>Video</span>
-                  <input id="videoZoomRange" type="range" min="60" max="180" step="5" value="100" />
+                  <input id="videoZoomRange" type="range" min="35" max="400" step="5" value="100" />
                   <output id="videoZoomValue">100%</output>
                 </label>
                 <button class="ghost-button video-fit-control" id="videoFitBtn" type="button">Vừa khung</button>
@@ -133,6 +133,32 @@
                   <span>Cỡ chữ</span>
                   <input id="subtitleSizeRange" type="range" min="8" max="120" step="1" value="32" />
                   <output id="subtitleSizeValue">32px</output>
+                </label>
+                <label class="zoom-control subtitle-style-control select-control font-select-control">
+                  <span>Font</span>
+                  <select id="subtitleFontSelect" aria-label="Font chữ phụ đề">
+                    <option value="Arial" selected>Arial</option>
+                    <option value="Tahoma">Tahoma</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Segoe UI">Segoe UI</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Impact">Impact</option>
+                  </select>
+                </label>
+                <label class="zoom-control subtitle-style-control select-control weight-select-control">
+                  <span>Kiểu</span>
+                  <select id="subtitleWeightSelect" aria-label="Kiểu chữ phụ đề">
+                    <option value="400">Thường</option>
+                    <option value="700">Đậm</option>
+                    <option value="900" selected>Rất đậm</option>
+                  </select>
+                </label>
+                <label class="zoom-control subtitle-style-control subtitle-color-control">
+                  <span>Màu chữ</span>
+                  <input id="subtitleColorInput" type="color" value="#ffffff" aria-label="Màu chữ phụ đề" />
+                  <output id="subtitleColorValue">#FFFFFF</output>
                 </label>
                 <label class="zoom-control subtitle-style-control">
                   <span>Rộng chữ</span>
@@ -211,7 +237,7 @@
               <strong>Tải video lên để bắt đầu</strong>
               <span>Video xem trước sẽ hiển thị tại đây.</span>
             </div>
-            <button class="canvas-resize-handle" id="canvasResizeHandle" type="button" aria-label="Kéo để phóng to hoặc thu nhỏ khung video"></button>
+            <button class="canvas-resize-handle" id="canvasResizeHandle" type="button" aria-label="Kéo để zoom nhanh khung video"></button>
           </div>
 
         </section>
@@ -420,6 +446,6 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=fix-subtitle-ass-anchor-20260508" defer></script>
+    <script src="/static/app.js?v=fix-subtitle-font-color-20260508" defer></script>
   </body>
 </html>

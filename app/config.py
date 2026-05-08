@@ -124,6 +124,9 @@ class RenderConfig(BaseModel):
     subtitle_cover_position_y: float = 8
     subtitle_cover_opacity: float = 0.9
     subtitle_font_size: float = 32
+    subtitle_font_family: str = "Arial"
+    subtitle_font_weight: str = "900"
+    subtitle_primary_color: str = "#FFFFFF"
     subtitle_box_width_ratio: float = 0.84
     subtitle_position_x: float = 50
     subtitle_position_y: float = 8

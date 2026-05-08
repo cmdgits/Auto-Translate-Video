@@ -646,6 +646,9 @@ class VideoTranslationPipeline:
             transcript,
             context.ass_path,
             font_size=subtitle_render_config.subtitle_font_size,
+            font_family=subtitle_render_config.subtitle_font_family,
+            font_weight=subtitle_render_config.subtitle_font_weight,
+            primary_color=subtitle_render_config.subtitle_primary_color,
             box_width_ratio=subtitle_render_config.subtitle_box_width_ratio,
             position_x_percent=subtitle_render_config.subtitle_position_x,
             bottom_percent=subtitle_render_config.subtitle_position_y,
@@ -774,6 +777,12 @@ class VideoTranslationPipeline:
             updates["subtitle_cover_position_y"] = max(0.0, min(100.0, float(options.subtitle_cover_position_y)))
         if options.subtitle_font_size is not None:
             updates["subtitle_font_size"] = max(8.0, min(120.0, float(options.subtitle_font_size)))
+        if options.subtitle_font_family:
+            updates["subtitle_font_family"] = str(options.subtitle_font_family).strip()
+        if options.subtitle_font_weight:
+            updates["subtitle_font_weight"] = str(options.subtitle_font_weight).strip()
+        if options.subtitle_primary_color:
+            updates["subtitle_primary_color"] = str(options.subtitle_primary_color).strip()
         if options.subtitle_box_width_ratio is not None:
             updates["subtitle_box_width_ratio"] = max(0.1, min(1.0, float(options.subtitle_box_width_ratio)))
         if options.subtitle_position_x is not None:
