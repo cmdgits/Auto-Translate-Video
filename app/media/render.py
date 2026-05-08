@@ -4,7 +4,19 @@ from pathlib import Path
 from typing import Callable
 
 from app.config import RenderConfig
+from app.core.exceptions import ProcessError
 from app.media.ffmpeg import ensure_binary, run_ffmpeg_process, get_available_video_encoders
+
+
+def ensure_render_output(output_video: Path) -> Path:
+    try:
+        output_size = output_video.stat().st_size
+    except OSError as exc:
+        raise ProcessError(f"FFmpeg khong tao duoc file output: {output_video}") from exc
+    if output_size <= 0:
+        output_video.unlink(missing_ok=True)
+        raise ProcessError(f"FFmpeg tao file output 0 byte: {output_video}")
+    return output_video
 
 def escape_subtitle_filter_path(path: Path) -> str:
     escaped = path.resolve().as_posix()
@@ -136,19 +148,8 @@ def burn_subtitles_into_video(
             str(output_video),
         ]
 
-    try:
-        run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
-    except Exception as e:
-        from app.core.exceptions import ProcessError
-        if isinstance(e, ProcessError) and codec in {"h264_nvenc", "h264_qsv", "h264_amf"}:
-            import logging
-            logging.getLogger(__name__).warning(f"GPU rendering with {codec} failed, falling back to libx264 CPU rendering. Error: {e}")
-            if output_video.exists():
-                output_video.unlink(missing_ok=True)
-            run_ffmpeg_process(_build_command("libx264"), duration_sec=duration_sec, progress_callback=progress_callback)
-        else:
-            raise e
-    return output_video
+    run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
+    return ensure_render_output(output_video)
 
 
 def render_video_with_replaced_audio(
@@ -182,7 +183,7 @@ def render_video_with_replaced_audio(
         str(output_video),
     ]
     run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
-    return output_video
+    return ensure_render_output(output_video)
 
 
 def mux_subtitle_tracks_into_video(
@@ -235,19 +236,8 @@ def mux_subtitle_tracks_into_video(
         command.append(str(output_video))
         return command
 
-    try:
-        run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
-    except Exception as e:
-        from app.core.exceptions import ProcessError
-        if isinstance(e, ProcessError) and codec in {"h264_nvenc", "h264_qsv", "h264_amf"}:
-            import logging
-            logging.getLogger(__name__).warning(f"GPU rendering with {codec} failed, falling back to libx264 CPU rendering. Error: {e}")
-            if output_video.exists():
-                output_video.unlink(missing_ok=True)
-            run_ffmpeg_process(_build_command("libx264"), duration_sec=duration_sec, progress_callback=progress_callback)
-        else:
-            raise e
-    return output_video
+    run_ffmpeg_process(_build_command(codec), duration_sec=duration_sec, progress_callback=progress_callback)
+    return ensure_render_output(output_video)
 
 
 def build_mux_subtitle_tracks_command_string(

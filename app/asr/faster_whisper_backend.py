@@ -68,12 +68,6 @@ class FasterWhisperBackend(ASRBackend):
         configured_device = str(self.config.device or "auto").strip().lower()
         if configured_device == "cpu":
             return [("cpu", self._compute_type_for_device("cpu"))]
-        if getattr(sys, "frozen", False) and not self._cuda_asr_explicitly_enabled():
-            self._add_warning(
-                "Bản EXE mặc định dùng CPU cho ASR để tránh kẹt 48% trên máy thiếu CUDA/cuDNN. "
-                f"Muốn thử ASR GPU, đặt {ENABLE_CUDA_ASR_ENV_VAR}=1 trước khi mở EXE."
-            )
-            return [("cpu", self._compute_type_for_device("cpu"))]
         if configured_device == "cuda":
             return [("cuda", self._compute_type_for_device("cuda")), ("cpu", self._compute_type_for_device("cpu"))]
         if self._has_usable_cuda():
@@ -85,12 +79,37 @@ class FasterWhisperBackend(ASRBackend):
 
     def _has_usable_cuda(self) -> bool:
         try:
+            self._add_cuda_runtime_dirs()
             import ctranslate2
 
             return int(ctranslate2.get_cuda_device_count()) > 0
         except Exception as exc:
             logger.info("CUDA ASR không khả dụng, dùng CPU. Chi tiết: %s", exc)
             return False
+
+    def _add_cuda_runtime_dirs(self) -> None:
+        site_packages = Path(sys.executable).resolve().parent / "Lib" / "site-packages"
+        candidates = [
+            PROJECT_ROOT / "tools" / "Python312" / "Lib" / "site-packages" / "nvidia" / "cublas" / "bin",
+            PROJECT_ROOT / "tools" / "Python312" / "Lib" / "site-packages" / "nvidia" / "cudnn" / "bin",
+            PROJECT_ROOT / "tools" / "Python312" / "Lib" / "site-packages" / "nvidia" / "cuda_runtime" / "bin",
+            PROJECT_ROOT / "tools" / "Python312" / "Lib" / "site-packages" / "nvidia" / "cuda_nvrtc" / "bin",
+            site_packages / "nvidia" / "cublas" / "bin",
+            site_packages / "nvidia" / "cudnn" / "bin",
+            site_packages / "nvidia" / "cuda_runtime" / "bin",
+            site_packages / "nvidia" / "cuda_nvrtc" / "bin",
+            Path(sys.executable).resolve().parent,
+            Path(getattr(sys, "_MEIPASS", PROJECT_ROOT)),
+        ]
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            os.environ["PATH"] = f"{candidate}{os.pathsep}{os.environ.get('PATH', '')}"
+            if hasattr(os, "add_dll_directory"):
+                try:
+                    os.add_dll_directory(str(candidate))
+                except OSError:
+                    pass
 
     def _has_nvidia_gpu_name(self) -> bool:
         nvidia_smi = shutil.which("nvidia-smi")
@@ -123,6 +142,7 @@ class FasterWhisperBackend(ASRBackend):
         progress_hook: Callable[[float], None] | None = None,
     ) -> TranscriptDocument:
         os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+        self._add_cuda_runtime_dirs()
         try:
             from faster_whisper import WhisperModel
         except (ImportError, OSError) as exc:

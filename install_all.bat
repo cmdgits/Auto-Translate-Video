@@ -173,6 +173,10 @@ echo [3/6] Cai thu vien Python can thiet...
 if errorlevel 1 exit /b 1
 "%PYTHON_EXE%" -m pip install -e .
 if errorlevel 1 exit /b 1
+"%PYTHON_EXE%" -m pip install nvidia-cuda-runtime-cu12 nvidia-cuda-nvrtc-cu12 nvidia-cublas-cu12 nvidia-cudnn-cu12
+if errorlevel 1 (
+  echo [CANH BAO] Khong cai duoc runtime CUDA/cuDNN bang pip. ASR se fallback CPU neu may chua co CUDA/cuDNN trong PATH.
+)
 "%PYTHON_EXE%" -m pip install pyinstaller
 if errorlevel 1 exit /b 1
 echo [OK] Da cai dependencies.
@@ -208,7 +212,7 @@ exit /b 0
 echo [5/6] Tao/cap nhat config.yaml...
 if not exist "%ROOT%config.yaml" copy /Y "%ROOT%config.example.yaml" "%ROOT%config.yaml" >nul
 if not exist "%ROOT%.env" if exist "%ROOT%.env.example" copy /Y "%ROOT%.env.example" "%ROOT%.env" >nul
-"%PYTHON_EXE%" -c "from pathlib import Path; import yaml; p=Path('config.yaml'); data=yaml.safe_load(p.read_text(encoding='utf-8')) or {}; data['ffmpeg_bin']='tools/ffmpeg/bin/ffmpeg.exe'; data['ffprobe_bin']='tools/ffmpeg/bin/ffprobe.exe'; data.setdefault('worker',{})['backend']='thread'; data.setdefault('asr',{})['device']='auto'; data.setdefault('asr',{})['compute_type']='auto'; p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding='utf-8')"
+"%PYTHON_EXE%" -c "from pathlib import Path; import yaml; p=Path('config.yaml'); data=yaml.safe_load(p.read_text(encoding='utf-8')) or {}; data['ffmpeg_bin']='tools/ffmpeg/bin/ffmpeg.exe'; data['ffprobe_bin']='tools/ffmpeg/bin/ffprobe.exe'; data.setdefault('worker',{})['backend']='thread'; asr=data.setdefault('asr',{}); asr.setdefault('device','auto'); asr.setdefault('compute_type','auto'); p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding='utf-8')"
 if errorlevel 1 exit /b 1
 if not exist "%ROOT%workspace_data" mkdir "%ROOT%workspace_data"
 if not exist "%ROOT%workspace_data\jobs" mkdir "%ROOT%workspace_data\jobs"

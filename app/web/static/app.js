@@ -472,6 +472,26 @@ function asrDeviceLabel(options = {}) {
   return "ASR: auto";
 }
 
+function renderEncoderLabel(options = {}) {
+  const encoder = String(options.render_encoder_used || options.render_encoder || "").toLowerCase();
+  if (encoder === "nvidia") {
+    return "Render: NVIDIA GPU";
+  }
+  if (encoder === "intel") {
+    return "Render: Intel GPU";
+  }
+  if (encoder === "amd") {
+    return "Render: AMD GPU";
+  }
+  if (encoder === "cpu") {
+    return "Render: CPU";
+  }
+  if (encoder === "copy") {
+    return "Render: copy";
+  }
+  return "Render: auto";
+}
+
 function setMediaPanelCollapsed(collapsed, persist = true) {
   if (!appShell || !mediaPanelToggle) {
     return;
@@ -592,6 +612,9 @@ async function saveRenderedArtifact(job, destination) {
     throw new Error(`Không tải được ${config.label} sau khi xuất.`);
   }
   const blob = await response.blob();
+  if (!blob.size) {
+    throw new Error(`${config.label} xuat ra 0KB. Hay xuat lai video hoac kiem tra log FFmpeg.`);
+  }
   const savedDirectly = await saveBlobToDestination(blob, destination, defaultExportFilename(destination.artifact));
   setStatus(savedDirectly ? `Đã lưu ${config.label} vào nơi đã chọn` : `Đã tải ${config.label}`, "ok");
   showToast(savedDirectly ? `Đã lưu ${config.label}.` : `Đã tải ${config.label}.`, "ok");
@@ -2407,7 +2430,7 @@ function applyJobState(job) {
   }
   syncSubtitleStyleFromJob(job, isJobChanged);
 
-  languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"} · ${asrDeviceLabel(job.options)}`;
+  languageBadge.textContent = `ngôn ngữ gốc: ${job.detected_language || "--"} · ${asrDeviceLabel(job.options)} · ${renderEncoderLabel(job.options)}`;
   const jobPercent = Math.round((job.progress || 0) * 100);
   progressBadge.textContent = `${jobPercent}%`;
   updateRenderProgress(job);
@@ -2529,7 +2552,7 @@ function clearSelectedJob() {
   emptyState.style.display = "grid";
   updateVideoPlaybackControls();
   videoName.textContent = "Chưa chọn video";
-  languageBadge.textContent = "ngôn ngữ gốc: -- · ASR: auto";
+  languageBadge.textContent = "ngôn ngữ gốc: -- · ASR: auto · Render: auto";
   progressBadge.textContent = "0%";
   state.extraSubtitleTracks = [];
   updateRenderProgress(null);

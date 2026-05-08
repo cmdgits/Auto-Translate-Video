@@ -19,6 +19,7 @@ def bundled_config_path() -> Path | None:
     candidates = [
         runtime_root() / "config.yaml",
         runtime_root() / "config.example.yaml",
+        Path(getattr(sys, "_MEIPASS", runtime_root())) / "config.yaml",
         Path(getattr(sys, "_MEIPASS", runtime_root())) / "config.example.yaml",
     ]
     for candidate in candidates:
@@ -41,6 +42,28 @@ def add_bundled_ffmpeg_to_path() -> None:
             break
 
 
+def add_runtime_dll_dirs() -> None:
+    import os
+
+    candidates = [runtime_root(), Path(getattr(sys, "_MEIPASS", runtime_root()))]
+    python_root = runtime_root() / "tools" / "Python312" / "Lib" / "site-packages" / "nvidia"
+    candidates.extend([
+        python_root / "cublas" / "bin",
+        python_root / "cudnn" / "bin",
+        python_root / "cuda_runtime" / "bin",
+        python_root / "cuda_nvrtc" / "bin",
+    ])
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        os.environ["PATH"] = f"{candidate}{os.pathsep}{os.environ.get('PATH', '')}"
+        if hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(str(candidate))
+            except OSError:
+                pass
+
+
 def choose_available_port(host: str, preferred_port: int) -> int:
     for port in range(preferred_port, preferred_port + 20):
         with socket() as probe:
@@ -56,6 +79,7 @@ def main() -> None:
     multiprocessing.freeze_support()
     host = "127.0.0.1"
     port = choose_available_port(host, 8001)
+    add_runtime_dll_dirs()
     add_bundled_ffmpeg_to_path()
     os.environ.setdefault("AUTOTRANSLATE_WORKER_BACKEND", "thread")
     config_path = bundled_config_path()

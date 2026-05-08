@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -8,8 +9,9 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.example.yaml"
+PROJECT_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
+BUNDLE_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+DEFAULT_CONFIG_PATH = (BUNDLE_ROOT if getattr(sys, "frozen", False) else PROJECT_ROOT) / "config.example.yaml"
 LOCAL_CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 CONFIG_ENV_VAR = "AUTOTRANSLATE_CONFIG"
 WORKER_BACKEND_ENV_VAR = "AUTOTRANSLATE_WORKER_BACKEND"
@@ -25,7 +27,13 @@ def _resolve_binary(value: str) -> str:
     if path.is_absolute():
         return str(path)
     if len(path.parts) > 1:
-        return str((PROJECT_ROOT / path).resolve())
+        project_candidate = PROJECT_ROOT / path
+        if project_candidate.exists():
+            return str(project_candidate.resolve())
+        bundle_candidate = BUNDLE_ROOT / path
+        if bundle_candidate.exists():
+            return str(bundle_candidate.resolve())
+        return path.name
     return value
 
 

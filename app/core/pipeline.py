@@ -20,6 +20,7 @@ from app.media.render import (
     mux_subtitle_tracks_into_video,
     render_video_with_replaced_audio,
 )
+from app.media.ffmpeg import get_available_video_encoders
 from app.media.waveform import write_waveform_json
 from app.models import (
     JobManifest,
@@ -54,6 +55,7 @@ class VideoTranslationPipeline:
         self.config = config
         self.jobs = JobManager(config.directories.jobs_dir)
         self._detected_render_encoders: list[str] | None = None
+        self._last_render_encoder_used: str | None = None
 
     def cancel_job(self, job_id: str, reason: str = "Tác vụ đã được dừng theo yêu cầu.") -> JobManifest:
         context, manifest = self._require_job(job_id)
@@ -223,6 +225,7 @@ class VideoTranslationPipeline:
 
                     self._render_hardsub_output(context, run_options, on_hardsub_progress)
                     self._raise_if_cancelled(context)
+                    manifest = self._with_render_encoder_options(manifest)
                     timings["render_hardsub_sec"] = round(time.perf_counter() - render_started, 3)
                 except Exception as exc:  # pragma: no cover - runtime dependency path
                     render_errors.append(f"Hardsub render loi: {exc}")
@@ -252,6 +255,7 @@ class VideoTranslationPipeline:
                         on_voiceover_progress,
                     )
                     self._raise_if_cancelled(context)
+                    manifest = self._with_render_encoder_options(manifest)
                     timings["render_voiceover_sec"] = round(time.perf_counter() - render_started, 3)
                 except Exception as exc:  # pragma: no cover - runtime dependency path
                     render_errors.append(f"Voice-over render loi: {exc}")
@@ -447,6 +451,7 @@ class VideoTranslationPipeline:
 
             self._render_hardsub_output(context, options, on_hardsub_progress)
             self._raise_if_cancelled(context)
+            running_manifest = self._with_render_encoder_options(running_manifest)
             timings = {**manifest.timings, "render_hardsub_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
                 update={
@@ -513,6 +518,7 @@ class VideoTranslationPipeline:
 
             self._render_softsub_output(context, run_options, on_softsub_progress)
             self._raise_if_cancelled(context)
+            running_manifest = self._with_render_encoder_options(running_manifest)
             timings = {**manifest.timings, "render_softsub_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
                 update={
@@ -590,6 +596,7 @@ class VideoTranslationPipeline:
                 on_voiceover_progress,
             )
             self._raise_if_cancelled(context)
+            running_manifest = self._with_render_encoder_options(running_manifest)
             timings = {**manifest.timings, "render_voiceover_sec": round(time.perf_counter() - started_at, 3)}
             updated_manifest = running_manifest.model_copy(
                 update={
@@ -811,6 +818,22 @@ class VideoTranslationPipeline:
             detected.append("intel")
         if "amd" in gpu_text or "radeon" in gpu_text:
             detected.append("amd")
+        available_video_encoders = get_available_video_encoders(self.config.ffmpeg_bin)
+        if not detected:
+            if "h264_nvenc" in available_video_encoders:
+                detected.append("nvidia")
+            if "h264_qsv" in available_video_encoders:
+                detected.append("intel")
+            if "h264_amf" in available_video_encoders:
+                detected.append("amd")
+        else:
+            detected = [
+                encoder
+                for encoder in detected
+                if (encoder == "nvidia" and "h264_nvenc" in available_video_encoders)
+                or (encoder == "intel" and "h264_qsv" in available_video_encoders)
+                or (encoder == "amd" and "h264_amf" in available_video_encoders)
+            ]
         self._detected_render_encoders = detected
         return detected
 
@@ -851,10 +874,12 @@ class VideoTranslationPipeline:
                     }
                 )
             try:
+                self._last_render_encoder_used = encoder
                 return renderer(active_config)
             except DependencyError:
                 raise
             except ProcessError as exc:
+                self._last_render_encoder_used = None
                 if encoder == "cpu" or requested_encoder:
                     if errors:
                         raise ProcessError("\n\n".join([*errors, str(exc)])) from exc
@@ -892,6 +917,18 @@ class VideoTranslationPipeline:
         }
         updates = (hardware_presets.get(selected_encoder, cpu_presets)).get(selected_preset, cpu_presets["balanced"])
         return {**updates, "encoder": selected_encoder, "quality_preset": selected_preset}
+
+    def _with_render_encoder_options(self, manifest: JobManifest) -> JobManifest:
+        if not self._last_render_encoder_used:
+            return manifest
+        return manifest.model_copy(
+            update={
+                "options": {
+                    **(manifest.options or {}),
+                    "render_encoder_used": self._last_render_encoder_used,
+                }
+            }
+        )
 
     def _render_voiceover_output(
         self,
@@ -938,6 +975,7 @@ class VideoTranslationPipeline:
             progress_callback=lambda value: emit_voiceover_progress(0.45 + value * 0.2),
         )
         emit_voiceover_progress(0.65)
+        self._last_render_encoder_used = "copy"
         return render_video_with_replaced_audio(
             input_video=context.input_video,
             audio_path=mixed_audio,
@@ -1057,7 +1095,13 @@ class VideoTranslationPipeline:
             "voiceover_audio": context.voiceover_audio_path,
             "video_voiceover": context.voiceover_video_path,
         }
-        return {key: str(path) for key, path in candidates.items() if path.exists()}
+        return {key: str(path) for key, path in candidates.items() if self._is_valid_output(path)}
+
+    def _is_valid_output(self, path: Path) -> bool:
+        try:
+            return path.exists() and path.is_file() and path.stat().st_size > 0
+        except OSError:
+            return False
 
     def _invalidate_render_outputs(self, context: JobContext) -> None:
         for path in (

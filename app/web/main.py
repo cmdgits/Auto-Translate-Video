@@ -87,7 +87,7 @@ def _manifest_payload(manifest: JobManifest) -> dict:
     payload["downloads"] = {
         key: f"/api/download/{manifest.job_id}/{key}"
         for key, value in manifest.outputs.items()
-        if value and Path(value).exists()
+        if value and _is_downloadable_file(Path(value))
     }
     payload["preview_urls"] = {"source": f"/api/source/{manifest.job_id}"}
     if manifest.outputs.get("video_hardsub"):
@@ -120,6 +120,13 @@ def _get_manifest_or_404(job_id: str) -> JobManifest:
     if manifest is None:
         raise HTTPException(status_code=404, detail="Khong tim thay job.")
     return manifest
+
+
+def _is_downloadable_file(path: Path) -> bool:
+    try:
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
 
 
 def _has_active_local_render(job_id: str, task_type: str) -> bool:
@@ -682,4 +689,6 @@ async def download_artifact(job_id: str, artifact: str) -> FileResponse:
     path = Path(output_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Artifact da mat hoac chua duoc tao.")
+    if not _is_downloadable_file(path):
+        raise HTTPException(status_code=409, detail="Artifact duoc tao nhung rong 0 byte. Hay xuat lai video.")
     return FileResponse(path, filename=path.name)
