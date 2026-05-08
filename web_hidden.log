@@ -1,0 +1,13 @@
+INFO:     127.0.0.1:60561 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60561 - "GET /static/styles.css?v=fix-subtitle-font-color-20260508 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60562 - "GET /static/app.js?v=fix-subtitle-font-color-20260508 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60562 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60562 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /api/jobs/FSave_Reels_Media_1247763757346212_001_720p_20260508_111627 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /api/jobs/FSave_Reels_Media_1247763757346212_001_720p_20260508_111627/waveform HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60563 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60563 - "GET /api/jobs HTTP/1.1" 200 OK

@@ -202,6 +202,7 @@ def web(
     host: str = typer.Option("127.0.0.1", help="Host web UI."),
     port: int = typer.Option(8001, help="Port web UI."),
     reload: bool = typer.Option(False, help="Bat auto reload cho dev."),
+    open_browser: bool = typer.Option(True, "--open-browser/--no-open-browser", help="Tu dong mo trinh duyet khi server san sang."),
 ) -> None:
     """Chay giao dien web editor kieu CapCut."""
     if sys.version_info >= (3, 14):
@@ -210,9 +211,10 @@ def web(
             "Hay dung .\\run_web.bat hoac tools\\Python312\\python.exe -m app.main web --host 127.0.0.1 --port 8001"
         )
         raise typer.Exit(code=1)
-    import threading
-    import webbrowser
-    threading.Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}/")).start()
+    if open_browser:
+        import threading
+        import webbrowser
+        threading.Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}/")).start()
     uvicorn.run("app.web.main:app", host=host, port=port, reload=reload, factory=False)
 
 
