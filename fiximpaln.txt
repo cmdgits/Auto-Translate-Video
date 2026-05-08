@@ -1,0 +1,32 @@
+Implementation Plan - Fix API Settings Toggle
+The user reported that the "Cài đặt API dịch" (API Service Settings) button is not clickable. Investigation reveals that while the event listener is present, the panel's absolute positioning relative to a scrollable sidebar and potential interference from global click listeners likely cause it to be either invisible or immediately closed upon clicking.
+
+User Review Required
+IMPORTANT
+
+The API Settings panel will be changed from position: absolute to position: fixed to ensure it remains visible even if the user has scrolled down the sidebar. This may cause it to overlap other elements if the window is very narrow, but it ensures functionality.
+
+Proposed Changes
+Stylesheets
+[MODIFY] 
+styles.css
+Change .api-settings-panel from position: absolute to position: fixed.
+Set width: 256px and left: 12px to align with the sidebar's typical layout.
+Increase z-index to 100 to ensure it stays above the main editor content.
+Adjust top to 74px (below the header).
+Frontend Logic
+[MODIFY] 
+app.js
+Add event.stopPropagation() to the apiSettingsToggle click listener.
+Update setApiSettingsPanelOpen to be more robust and manage aria-expanded.
+Fix the potential TypeError in the toggle logic by adding proper null checks.
+Verification Plan
+Automated Tests
+Use the browser tool to:
+Navigate to the editor page.
+Scroll the sidebar (media panel) down.
+Click the "Cài đặt API dịch" button.
+Verify that the apiSettingsPanel is visible.
+Click outside the panel and verify it closes.
+Manual Verification
+Ask the user to refresh the page and test the button interaction.

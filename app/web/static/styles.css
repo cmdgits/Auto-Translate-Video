@@ -180,7 +180,15 @@ button {
 }
 
 .upload-form input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .upload-button,
@@ -457,18 +465,18 @@ button {
 }
 
 .api-settings-panel {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 118px;
-  z-index: 12;
-  max-height: calc(100vh - 136px);
+  position: fixed;
+  left: 296px;
+  width: 280px;
+  top: 74px;
+  z-index: 100;
+  max-height: calc(100vh - 90px);
   overflow: auto;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(24, 24, 27, 0.75);
-  backdrop-filter: blur(16px);
+  background: rgba(24, 24, 27, 0.92);
+  backdrop-filter: blur(20px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 

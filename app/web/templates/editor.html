@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="/static/styles.css?v=capcut-layout-20260504-63" />
+    <link rel="stylesheet" href="/static/styles.css?v=fix-js-upload-api-20260508" />
   </head>
   <body>
     <div class="capcut-shell" id="appShell">
@@ -104,67 +104,6 @@
           </div>
         </section>
 
-        <div class="api-settings-panel hidden" id="apiSettingsPanel" role="dialog" aria-label="Cài đặt API dịch">
-          <div class="api-settings-header">
-            <div>
-              <span>Cài đặt API dịch</span>
-              <small>Gemini, OpenAI, LLM riêng</small>
-            </div>
-            <button class="mini-button" id="apiSettingsClose" type="button">Đóng</button>
-          </div>
-          <form id="apiSettingsForm" class="stacked-form settings-grid">
-            <label class="field">
-              <span>Gemini API key</span>
-              <input name="gemini_api_key" type="password" placeholder="AIza..." autocomplete="off" />
-            </label>
-            <label class="field two-col">
-              <span>Gemini model</span>
-              <input name="gemini_model" type="text" value="gemini-2.5-flash-lite" placeholder="gemini-2.5-flash-lite" />
-            </label>
-            <label class="field two-col">
-              <span>Gemini base URL</span>
-              <input name="gemini_base_url" type="text" value="https://generativelanguage.googleapis.com/v1beta" />
-            </label>
-            <label class="field">
-              <span>OpenAI API key</span>
-              <input name="openai_api_key" type="password" placeholder="sk-..." autocomplete="off" />
-            </label>
-            <label class="field two-col">
-              <span>OpenAI model</span>
-              <input name="openai_model" type="text" value="gpt-4.1-mini" />
-            </label>
-            <label class="field two-col">
-              <span>OpenAI base URL</span>
-              <input name="openai_base_url" type="text" value="https://api.openai.com/v1" />
-            </label>
-            <label class="field">
-              <span>LLM base URL</span>
-              <input name="llm_base_url" type="text" placeholder="http://localhost:11434/v1" />
-            </label>
-            <label class="field two-col">
-              <span>LLM API key</span>
-              <input name="llm_api_key" type="password" placeholder="tuỳ chọn" autocomplete="off" />
-            </label>
-            <label class="field two-col">
-              <span>LLM model</span>
-              <input name="llm_model" type="text" placeholder="translator-model" />
-            </label>
-            <label class="field two-col">
-              <span>LibreTranslate URL</span>
-              <input name="libretranslate_url" type="text" placeholder="http://localhost:5000" />
-            </label>
-            <label class="field two-col">
-              <span>LibreTranslate key</span>
-              <input name="libretranslate_api_key" type="password" autocomplete="off" />
-            </label>
-            <label class="field two-col">
-              <span>Glossary thuật ngữ</span>
-              <textarea name="glossary_text" rows="5" placeholder="AI = trí tuệ nhân tạo&#10;render = xuất video&#10;timeline = dòng thời gian"></textarea>
-            </label>
-            <button class="secondary-action" id="saveApiSettingsBtn" type="button">Lưu cài đặt API</button>
-            <span class="muted" id="apiSettingsStatus">Chỉ cần mở khi muốn đổi khóa hoặc model.</span>
-          </form>
-        </div>
       </aside>
 
       <main class="editor-main">
@@ -412,7 +351,69 @@
       </div>
     </div>
 
+    <div class="api-settings-panel hidden" id="apiSettingsPanel" role="dialog" aria-label="Cài đặt API dịch">
+      <div class="api-settings-header">
+        <div>
+          <span>Cài đặt API dịch</span>
+          <small>Gemini, OpenAI, LLM riêng</small>
+        </div>
+        <button class="mini-button" id="apiSettingsClose" type="button">Đóng</button>
+      </div>
+      <form id="apiSettingsForm" class="stacked-form settings-grid">
+        <label class="field">
+          <span>Gemini API key</span>
+          <input name="gemini_api_key" type="password" placeholder="AIza..." autocomplete="off" />
+        </label>
+        <label class="field two-col">
+          <span>Gemini model</span>
+          <input name="gemini_model" type="text" value="gemini-2.5-flash-lite" placeholder="gemini-2.5-flash-lite" />
+        </label>
+        <label class="field two-col">
+          <span>Gemini base URL</span>
+          <input name="gemini_base_url" type="text" value="https://generativelanguage.googleapis.com/v1beta" />
+        </label>
+        <label class="field">
+          <span>OpenAI API key</span>
+          <input name="openai_api_key" type="password" placeholder="sk-..." autocomplete="off" />
+        </label>
+        <label class="field two-col">
+          <span>OpenAI model</span>
+          <input name="openai_model" type="text" value="gpt-4.1-mini" />
+        </label>
+        <label class="field two-col">
+          <span>OpenAI base URL</span>
+          <input name="openai_base_url" type="text" value="https://api.openai.com/v1" />
+        </label>
+        <label class="field">
+          <span>LLM base URL</span>
+          <input name="llm_base_url" type="text" placeholder="http://localhost:11434/v1" />
+        </label>
+        <label class="field two-col">
+          <span>LLM API key</span>
+          <input name="llm_api_key" type="password" placeholder="tuỳ chọn" autocomplete="off" />
+        </label>
+        <label class="field two-col">
+          <span>LLM model</span>
+          <input name="llm_model" type="text" placeholder="translator-model" />
+        </label>
+        <label class="field two-col">
+          <span>LibreTranslate URL</span>
+          <input name="libretranslate_url" type="text" placeholder="http://localhost:5000" />
+        </label>
+        <label class="field two-col">
+          <span>LibreTranslate key</span>
+          <input name="libretranslate_api_key" type="password" autocomplete="off" />
+        </label>
+        <label class="field two-col">
+          <span>Glossary thuật ngữ</span>
+          <textarea name="glossary_text" rows="5" placeholder="AI = trí tuệ nhân tạo&#10;render = xuất video&#10;timeline = dòng thời gian"></textarea>
+        </label>
+        <button class="secondary-action" id="saveApiSettingsBtn" type="button">Lưu cài đặt API</button>
+        <span class="muted" id="apiSettingsStatus">Chỉ cần mở khi muốn đổi khóa hoặc model.</span>
+      </form>
+    </div>
+
     <div class="toast hidden" id="toast"></div>
-    <script src="/static/app.js?v=capcut-layout-20260504-63" defer></script>
+    <script src="/static/app.js?v=fix-js-upload-api-20260508" defer></script>
   </body>
 </html>

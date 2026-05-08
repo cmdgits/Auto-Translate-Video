@@ -1779,47 +1779,6 @@ function renderJobList(jobs) {
   jobs.slice(0, 12).forEach((job) => {
     const item = document.createElement("div");
     item.className = "job-item";
-    }
-    return;
-  }
-  state.previewMode = mode;
-  state.previewSourceMode = sourceMode;
-  updatePreviewSource(targetUrl);
-  videoPreview.style.display = "block";
-  emptyState.style.display = "none";
-  setPreviewButtons();
-  updateVideoPlaybackControls();
-  applyPlaybackHighlight(videoPreview.currentTime || 0);
-}
-
-function renderArtifactLinks(job) {
-  const canRenderVideo = Boolean(job.downloads?.transcript_json && !["queued", "running"].includes(job.status));
-  setSubtitleDownloadAction(sourceSrtLink, Boolean(state.segments.length), "Lưu phụ đề gốc đang hiển thị");
-  setSubtitleDownloadAction(srtLink, Boolean(state.segments.length), "Lưu phụ đề dịch/đã sửa đang hiển thị");
-  setDownloadLink(vttLink, job.downloads?.subtitle_vtt);
-  setDownloadLink(jsonLink, job.downloads?.transcript_json);
-  setRenderActionLink(hardsubLink, canRenderVideo, "Xuất lại MP4 phụ đề từ nội dung đang sửa");
-  const extraTrackCount = state.extraSubtitleTracks.length;
-  setRenderActionLink(
-    softsubLink,
-    canRenderVideo,
-    extraTrackCount
-      ? `Xuất MKV softsub gồm phụ đề gốc, tiếng Việt và ${extraTrackCount} track thêm`
-      : "Xuất MKV softsub gồm phụ đề gốc và phụ đề tiếng Việt",
-  );
-  setRenderActionLink(voiceoverLink, canRenderVideo, "Xuất lại MP4 thuyết minh từ phụ đề đang sửa");
-}
-
-function renderJobList(jobs) {
-  jobList.innerHTML = "";
-  if (!jobs?.length) {
-    jobList.innerHTML = '<div class="script-empty">Tác vụ đang chờ sẽ hiện ở đây.</div>';
-    return;
-  }
-
-  jobs.slice(0, 12).forEach((job) => {
-    const item = document.createElement("div");
-    item.className = "job-item";
     item.dataset.id = job.job_id;
     if (job.job_id === state.jobId) {
       item.classList.add("selected");
@@ -3119,7 +3078,8 @@ previewHardsubBtn.addEventListener("click", () => setPreviewMode("hardsub"));
 previewVoiceoverBtn.addEventListener("click", () => setPreviewMode("voiceover"));
 
 if (apiSettingsToggle) {
-  apiSettingsToggle.addEventListener("click", () => {
+  apiSettingsToggle.addEventListener("click", (event) => {
+    event.stopPropagation();
     setApiSettingsPanelOpen(apiSettingsPanel?.classList.contains("hidden"));
   });
 }
