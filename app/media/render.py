@@ -47,13 +47,14 @@ def build_original_subtitle_cover_filter(render_config: RenderConfig) -> str:
         return ""
 
     blur_radius = max(3, min(30, int(round(cover_opacity * 22))))
+    safe_luma_radius = f"min({blur_radius}\\,min(w\\,h)/2)"
     blur_power = max(1, min(4, int(round(cover_opacity * 3))))
     return (
         f"split[base][blur_src];"
         f"[blur_src]crop=w=iw*{cover_width_ratio:.3f}:h=ih*{cover_height_ratio:.3f}:"
         f"x=iw*{cover_left_ratio:.3f}:y=ih*{cover_top:.3f},"
-        f"boxblur=luma_radius={blur_radius}:luma_power={blur_power}:"
-        f"chroma_radius={blur_radius}:chroma_power={blur_power}[blur_roi];"
+        f"boxblur=luma_radius={safe_luma_radius}:luma_power={blur_power}:"
+        f"chroma_radius=0:chroma_power=1[blur_roi];"
         f"[base][blur_roi]overlay=x=W*{cover_left_ratio:.3f}:y=H*{cover_top:.3f}"
     )
 

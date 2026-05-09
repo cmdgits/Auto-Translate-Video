@@ -1,4 +1,26 @@
-INFO:     Started server process [18424]
+INFO:     Started server process [18988]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8002 (Press CTRL+C to quit)
+Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Auto-Translate-Video\tools\Python312\Lib\asyncio\events.py", line 88, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Auto-Translate-Video\tools\Python312\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+C:\Auto-Translate-Video\tools\Python312\Lib\site-packages\ctranslate2\__init__.py:8: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+ASR không dùng \u0111\u01b0\u1ee3c NVIDIA/CUDA nên t\u1ef1 chuy\u1ec3n sang CPU. Chi ti\u1ebft: CUDA failed with error CUDA driver version is insufficient for CUDA runtime version
+Traceback (most recent call last):
+  File "C:\Auto-Translate-Video\app\asr\faster_whisper_backend.py", line 158, in transcribe
+    return self._transcribe_with_device(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Auto-Translate-Video\app\asr\faster_whisper_backend.py", line 201, in _transcribe_with_device
+    model = WhisperModel(
+            ^^^^^^^^^^^^^
+  File "C:\Auto-Translate-Video\tools\Python312\Lib\site-packages\faster_whisper\transcribe.py", line 689, in __init__
+    self.model = ctranslate2.models.Whisper(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: CUDA failed with error CUDA driver version is insufficient for CUDA runtime version
