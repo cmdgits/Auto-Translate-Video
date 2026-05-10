@@ -18,6 +18,7 @@ from app.media.render import (
     build_mux_subtitle_tracks_command_string,
     burn_subtitles_into_video,
     mux_subtitle_tracks_into_video,
+    remove_stale_render_outputs,
     render_video_with_replaced_audio,
 )
 from app.media.ffmpeg import get_available_video_encoders
@@ -352,6 +353,7 @@ class VideoTranslationPipeline:
 
         try:
             self._raise_if_cancelled(context)
+            remove_stale_render_outputs(context.voiceover_audio_path, context.voiceover_video_path)
             transcript = self._read_transcript(context)
             translator = build_translator(self.config.translation, run_options)
             source_language = (
