@@ -5,8 +5,19 @@ from typing import Callable
 
 from app.config import RenderConfig
 from app.core.exceptions import ProcessError
-from app.media.ffmpeg import ensure_binary, run_ffmpeg_process
+from app.media.ffmpeg import ensure_binary, ffmpeg_path, run_ffmpeg_process
 from app.tts.edge_tts_backend import VoiceClip
+
+
+def ensure_voiceover_audio_output(output_audio: Path) -> Path:
+    try:
+        output_size = output_audio.stat().st_size
+    except OSError as exc:
+        raise ProcessError(f"FFmpeg khong tao duoc file audio thuyet minh: {output_audio}") from exc
+    if output_size <= 0:
+        output_audio.unlink(missing_ok=True)
+        raise ProcessError(f"FFmpeg tao file audio thuyet minh 0 byte: {output_audio}")
+    return output_audio
 
 
 def mix_voiceover_audio(
@@ -27,10 +38,12 @@ def mix_voiceover_audio(
 
     output_audio.parent.mkdir(parents=True, exist_ok=True)
     filter_script_path.parent.mkdir(parents=True, exist_ok=True)
+    output_audio.unlink(missing_ok=True)
 
-    command = [ensure_binary(ffmpeg_bin), "-y", "-i", str(input_video)]
+    command_cwd = filter_script_path.parent
+    command = [ensure_binary(ffmpeg_bin), "-y", "-i", ffmpeg_path(input_video, command_cwd)]
     for clip in clips:
-        command.extend(["-i", str(clip.path)])
+        command.extend(["-i", ffmpeg_path(clip.path, command_cwd)])
 
     filter_lines: list[str] = []
     voice_inputs: list[str] = []
@@ -79,15 +92,15 @@ def mix_voiceover_audio(
     command.extend(
         [
             "-filter_complex_script",
-            str(filter_script_path),
+            ffmpeg_path(filter_script_path, command_cwd),
             "-map",
             "[aout]",
             "-c:a",
             render_config.audio_codec,
             "-b:a",
             render_config.audio_bitrate,
-            str(output_audio),
+            ffmpeg_path(output_audio, command_cwd),
         ]
     )
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
-    return output_audio
+    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback, cwd=command_cwd)
+    return ensure_voiceover_audio_output(output_audio)

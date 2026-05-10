@@ -8,6 +8,18 @@ from pathlib import Path
 
 from app.models import JobManifest
 
+MAX_JOB_STEM_LENGTH = 80
+
+
+def _safe_job_stem(input_name: str) -> str:
+    import re
+
+    raw_stem = Path(input_name).stem.strip() or "video"
+    safe_stem = re.sub(r'[\\/*?:"<>|]', "_", raw_stem).strip(" ._") or "video"
+    if len(safe_stem) > MAX_JOB_STEM_LENGTH:
+        safe_stem = safe_stem[:MAX_JOB_STEM_LENGTH].rstrip(" ._") or "video"
+    return safe_stem
+
 
 @dataclass
 class JobContext:
@@ -48,11 +60,9 @@ class JobManager:
         input_video: Path,
         output_root: Path | None = None,
     ) -> JobContext:
-        import re
         jobs_root = output_root or self.jobs_root
         jobs_root.mkdir(parents=True, exist_ok=True)
-        raw_stem = Path(input_name).stem.strip() or "video"
-        safe_stem = re.sub(r'[\\/*?:"<>|]', "_", raw_stem)
+        safe_stem = _safe_job_stem(input_name)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_id = f"{safe_stem}_{timestamp}"
         root_dir = jobs_root / job_id

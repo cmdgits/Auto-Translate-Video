@@ -16,6 +16,13 @@ from app.media.probe import probe_video
 from app.models import PipelineRunOptions
 
 app = typer.Typer(help="Auto Translate Video CLI")
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except AttributeError:
+    pass
+
 console = Console()
 
 

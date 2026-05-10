@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,6 +19,16 @@ def ensure_binary(binary_name: str) -> str:
     raise DependencyError(
         f"Khong tim thay '{binary_name}' trong PATH. Cai FFmpeg roi them vao PATH truoc khi chay pipeline."
     )
+
+
+def ffmpeg_path(path: Path, cwd: Path | None = None) -> str:
+    """Return a short path for FFmpeg command arguments when possible."""
+    if cwd is None:
+        return str(path)
+    try:
+        return os.path.relpath(path.resolve(), cwd.resolve())
+    except (OSError, ValueError):
+        return str(path)
 
 
 def run_process(command: list[str], cwd: Path | None = None) -> str:

@@ -5,7 +5,7 @@ from typing import Callable
 
 from app.config import RenderConfig
 from app.core.exceptions import ProcessError
-from app.media.ffmpeg import ensure_binary, run_ffmpeg_process, get_available_video_encoders
+from app.media.ffmpeg import ensure_binary, ffmpeg_path, run_ffmpeg_process, get_available_video_encoders
 
 
 def ensure_render_output(output_video: Path) -> Path:
@@ -17,6 +17,20 @@ def ensure_render_output(output_video: Path) -> Path:
         output_video.unlink(missing_ok=True)
         raise ProcessError(f"FFmpeg tao file output 0 byte: {output_video}")
     return output_video
+
+
+def remove_stale_render_output(output_path: Path) -> None:
+    try:
+        if output_path.exists():
+            output_path.unlink()
+    except OSError as exc:
+        raise ProcessError(f"Khong xoa duoc file output cu: {output_path}") from exc
+
+
+def remove_stale_render_outputs(*output_paths: Path) -> None:
+    for output_path in output_paths:
+        remove_stale_render_output(output_path)
+
 
 def escape_subtitle_filter_path(path: Path) -> str:
     escaped = path.resolve().as_posix()
@@ -123,6 +137,7 @@ def burn_subtitles_into_video(
     progress_callback: Callable[[float], None] | None = None,
 ) -> Path:
     output_video.parent.mkdir(parents=True, exist_ok=True)
+    remove_stale_render_output(output_video)
     subtitle_filter = build_hardsub_filter(subtitle_path, render_config)
     filter_graph = f"[0:v]{subtitle_filter}[v]"
     codec = select_video_codec(render_config, ffmpeg_bin)
@@ -163,27 +178,46 @@ def render_video_with_replaced_audio(
     progress_callback: Callable[[float], None] | None = None,
 ) -> Path:
     output_video.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        ensure_binary(ffmpeg_bin),
-        "-y",
-        "-i",
-        str(input_video),
-        "-i",
-        str(audio_path),
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "copy",
-        "-shortest",
-        "-movflags",
-        "+faststart",
-        str(output_video),
-    ]
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback)
+    remove_stale_render_output(output_video)
+    command_cwd = output_video.parent
+    ffmpeg = ensure_binary(ffmpeg_bin)
+
+    def build_command(audio_codec_args: list[str]) -> list[str]:
+        return [
+            ffmpeg,
+            "-y",
+            "-i",
+            ffmpeg_path(input_video, command_cwd),
+            "-i",
+            ffmpeg_path(audio_path, command_cwd),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            *audio_codec_args,
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            ffmpeg_path(output_video, command_cwd),
+        ]
+
+    try:
+        run_ffmpeg_process(
+            build_command(["-c:a", "copy"]),
+            duration_sec=duration_sec,
+            progress_callback=progress_callback,
+            cwd=command_cwd,
+        )
+    except ProcessError:
+        remove_stale_render_output(output_video)
+        run_ffmpeg_process(
+            build_command(["-c:a", render_config.audio_codec, "-b:a", render_config.audio_bitrate]),
+            duration_sec=duration_sec,
+            progress_callback=progress_callback,
+            cwd=command_cwd,
+        )
     return ensure_render_output(output_video)
 
 
@@ -200,6 +234,7 @@ def mux_subtitle_tracks_into_video(
     if not subtitle_tracks:
         raise ValueError("Cần ít nhất một track phụ đề để mux softsub.")
     output_video.parent.mkdir(parents=True, exist_ok=True)
+    remove_stale_render_output(output_video)
     subtitle_codec = "srt" if output_video.suffix.lower() == ".mkv" else "mov_text"
     cover_filter = build_original_subtitle_cover_filter(render_config)
     codec = select_video_codec(render_config, ffmpeg_bin) if cover_filter else "copy"
