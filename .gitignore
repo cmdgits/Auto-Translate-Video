@@ -18,6 +18,8 @@ workspace_data/
 OllamaSetup.exe
 tools/*.exe
 *.zip
+*.log
+*.pid
 
 # Bỏ qua môi trường và tool nặng
 tools/ffmpeg/

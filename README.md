@@ -132,6 +132,8 @@ Sau khi chạy, mở trình duyệt tại:
 http://127.0.0.1:8001
 ```
 
+Muốn trỏ tên miền bất kỳ về IP public của server, xem `PUBLIC_INTERNET.md` và chạy `start_public_web.bat`.
+
 ## Quy Trình Sử Dụng Trên Web
 
 ### 1. Tải video lên
