@@ -88,7 +88,11 @@ def _write_tts_batch(
             ffmpeg_path(output_audio, command_cwd),
         ]
     )
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback, cwd=command_cwd)
+    try:
+        run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback, cwd=command_cwd)
+    except Exception:
+        _remove_file(output_audio)
+        raise
     return ensure_voiceover_audio_output(output_audio)
 
 
@@ -157,7 +161,11 @@ def _mix_voice_batches_with_bed(
             ffmpeg_path(output_audio, command_cwd),
         ]
     )
-    run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback, cwd=command_cwd)
+    try:
+        run_ffmpeg_process(command, duration_sec=duration_sec, progress_callback=progress_callback, cwd=command_cwd)
+    except Exception:
+        _remove_file(output_audio)
+        raise
     return ensure_voiceover_audio_output(output_audio)
 
 
@@ -223,5 +231,7 @@ def mix_voiceover_audio(
             progress_callback=lambda value: emit(0.72 + value * 0.28),
         )
     finally:
+        if not output_audio.exists() or output_audio.stat().st_size <= 0:
+            _remove_file(output_audio)
         for batch_output in voice_batch_outputs:
             _remove_file(batch_output)

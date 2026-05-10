@@ -1,55 +1,106 @@
-# Public web bang mot file BAT
+# Public web bang Cloudflare Tunnel
 
-File duy nhat can chay:
+Muc tieu:
+
+```text
+https://capcut.hieupro.io.vn
+  -> Cloudflare Tunnel
+  -> http://127.0.0.1:8080
+  -> Auto Translate Video
+```
+
+File duy nhat can chay tren may nay:
 
 ```text
 start_public_web.bat
 ```
 
-## Cach dung
+## Cach chay web
 
-- Lan dau: bam chuot phai `start_public_web.bat` -> **Run as administrator**.
-- Chon `1` de chay co UI/log, hoac chon `2` de chay an.
-- Tu lan sau: double-click `start_public_web.bat`, chon kieu chay ban muon.
-
-File nay tu:
-
-- Chay web tren `0.0.0.0:80`.
-- Mo Windows Firewall port `80` neu dang chay bang Administrator.
-- Khong bat dang nhap khi truy cap web.
-- Neu chay an, log nam trong `public_web_hidden.log` va `public_web_hidden_error.log`.
-
-## Tro domain ve server
-
-Voi bat ky ten mien nao, tao DNS A record ve IP public cua server/mang nha ban:
+1. Bam `start_public_web.bat`.
+2. Chon `2. Chay an`.
+3. Kiem tra local:
 
 ```text
-Type: A
-Name: @ hoac subdomain
-Value: IP public cua server
+http://127.0.0.1:8080/
 ```
 
-Router/modem can port-forward:
+Neu local vao duoc nhung domain khong vao duoc thi loi nam o Cloudflare Tunnel/Public Hostname, khong phai web app.
+
+## Cau hinh dung tren Cloudflare
+
+Vao Cloudflare Zero Trust:
 
 ```text
-External TCP 80 -> IP LAN may chay app TCP 80
+Networks -> Tunnels -> chon tunnel dang chay -> Public Hostnames
 ```
 
-Ten mien nao tro ve dung IP public do deu vao cung web.
-
-## Dung server an / dong firewall
-
-- Chon `3` trong menu de dung server an.
-- Chon `4` trong menu de dong firewall port `80`.
-
-Hoac chay bang Administrator:
-
+Them hoac sua hostname:
 
 ```text
-start_public_web.bat close
+Subdomain: capcut
+Domain: hieupro.io.vn
+Type: HTTP
+URL: 127.0.0.1:8080
 ```
 
-## Luu y
+Ket qua dung:
 
-- Neu port `80` bi phan mem khac chiem, hay tat IIS/Nginx/Apache hoac doi cau hinh port.
-- Neu nha mang dung CGNAT/khong co IP public that, port-forward se khong vao duoc.
+```text
+capcut.hieupro.io.vn -> HTTP -> http://127.0.0.1:8080
+```
+
+Neu Cloudflare yeu cau URL day du, nhap:
+
+```text
+http://127.0.0.1:8080
+```
+
+## Cach truy cap
+
+Chi truy cap bang link nay:
+
+```text
+https://capcut.hieupro.io.vn/
+```
+
+Khong truy cap:
+
+```text
+http://capcut.hieupro.io.vn:8080/
+```
+
+Ly do: port `8080` chi la port noi bo tren may chay app. Khi dung Cloudflare Tunnel, ben ngoai di qua HTTPS port `443` cua Cloudflare, khong di truc tiep vao port `8080` cua may.
+
+## Loi 502 Bad Gateway
+
+Neu domain tra `502 Bad Gateway` tu Cloudflare, thuong la do Public Hostname tro sai service URL.
+
+Can kiem tra:
+
+- Web local phai vao duoc: `http://127.0.0.1:8080/`.
+- Tunnel service phai dang Running tren Windows.
+- Public Hostname phai la `HTTP -> 127.0.0.1:8080`.
+- Neu `cloudflared` chay bang Docker, service URL phai doi thanh `http://host.docker.internal:8080`.
+- Khong tao DNS A record tro ve IP public khi dung Tunnel; de Cloudflare Tunnel tu tao CNAME ve `cfargotunnel.com`.
+
+## Lenh nhanh
+
+Kiem tra web local:
+
+```powershell
+curl.exe -L http://127.0.0.1:8080/
+```
+
+Kiem tra port app:
+
+```powershell
+netstat -ano | findstr /C:":8080" | findstr /C:"LISTENING"
+```
+
+Kiem tra service tunnel:
+
+```powershell
+Get-Service cloudflared
+```
+

@@ -204,20 +204,24 @@ def render_video_with_replaced_audio(
         ]
 
     try:
-        run_ffmpeg_process(
-            build_command(["-c:a", "copy"]),
-            duration_sec=duration_sec,
-            progress_callback=progress_callback,
-            cwd=command_cwd,
-        )
-    except ProcessError:
+        try:
+            run_ffmpeg_process(
+                build_command(["-c:a", "copy"]),
+                duration_sec=duration_sec,
+                progress_callback=progress_callback,
+                cwd=command_cwd,
+            )
+        except ProcessError:
+            remove_stale_render_output(output_video)
+            run_ffmpeg_process(
+                build_command(["-c:a", render_config.audio_codec, "-b:a", render_config.audio_bitrate]),
+                duration_sec=duration_sec,
+                progress_callback=progress_callback,
+                cwd=command_cwd,
+            )
+    except Exception:
         remove_stale_render_output(output_video)
-        run_ffmpeg_process(
-            build_command(["-c:a", render_config.audio_codec, "-b:a", render_config.audio_bitrate]),
-            duration_sec=duration_sec,
-            progress_callback=progress_callback,
-            cwd=command_cwd,
-        )
+        raise
     return ensure_render_output(output_video)
 
 
