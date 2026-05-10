@@ -41,9 +41,9 @@ from app.tts.voiceover import mix_voiceover_audio
 
 ProgressHook = Callable[[JobManifest], None]
 SUBTITLE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_-]{2,12}$")
-MAX_PUBLIC_HARDSUB_BYTES = 90_000_000
-COMPACT_HARDSUB_AUDIO_BITRATE = "128k"
-COMPACT_HARDSUB_MIN_CRF = 26
+HARDSUB_AUDIO_BITRATE = "128k"
+HARDSUB_MIN_CRF = 26
+HARDSUB_RENDER_PRESET = "fast"
 
 
 def ensure_video_has_audio(metadata: VideoMetadata) -> None:
@@ -649,7 +649,8 @@ class VideoTranslationPipeline:
     ) -> Path:
         if not context.srt_path.exists():
             raise ProcessError("Chua co file SRT de burn subtitle.")
-        subtitle_render_config = self._render_config_for_options(options)
+        hardsub_options = (options or PipelineRunOptions()).model_copy(update={"render_preset": HARDSUB_RENDER_PRESET})
+        subtitle_render_config = self._render_config_for_options(hardsub_options)
         manifest = self.jobs.load_manifest(context.job_id)
         video_width = manifest.metadata.width if manifest and manifest.metadata else None
         video_height = manifest.metadata.height if manifest and manifest.metadata else None
@@ -682,31 +683,18 @@ class VideoTranslationPipeline:
                 progress_callback=progress_callback,
             )
 
-        output_path = self._run_video_render_with_auto_encoder(
-            render_with_config,
-            options,
-        )
-        try:
-            output_size = output_path.stat().st_size
-        except OSError:
-            return output_path
-        if output_size <= MAX_PUBLIC_HARDSUB_BYTES:
-            return output_path
-
-        compact_options = (options or PipelineRunOptions()).model_copy(update={"render_preset": "fast"})
-
-        def render_compact(render_config: RenderConfig) -> Path:
-            compact_config = render_config.model_copy(
+        def render_once(render_config: RenderConfig) -> Path:
+            hardsub_config = render_config.model_copy(
                 update={
-                    "crf": max(int(render_config.crf), COMPACT_HARDSUB_MIN_CRF),
-                    "audio_bitrate": COMPACT_HARDSUB_AUDIO_BITRATE,
+                    "crf": max(int(render_config.crf), HARDSUB_MIN_CRF),
+                    "audio_bitrate": HARDSUB_AUDIO_BITRATE,
                 }
             )
-            return render_with_config(compact_config)
+            return render_with_config(hardsub_config)
 
         return self._run_video_render_with_auto_encoder(
-            render_compact,
-            compact_options,
+            render_once,
+            hardsub_options,
         )
 
     def _render_softsub_output(
